@@ -38,7 +38,15 @@ async def list_firewall_rules(
     async with UniFiClient(settings) as client:
         await client.authenticate()
 
-        response = await client.get(f"/ea/sites/{site_id}/rest/firewallrule")
+        # Use different endpoint for local API - custom firewall policies live at v2 API path
+        if settings.api_type.value == "local":
+            # For local API, use the v2 API path where custom firewall policies are stored
+            endpoint = f"/proxy/network/v2/api/site/default/firewall-policies"
+        else:
+            # For cloud API, use the standard endpoint
+            endpoint = f"/ea/sites/{site_id}/rest/firewallrule"
+
+        response = await client.get(endpoint)
         # Client now auto-unwraps the "data" field, so response is the actual data
         rules_data: list[dict[str, Any]] = (
             response if isinstance(response, list) else response.get("data", [])

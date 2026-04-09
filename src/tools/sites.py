@@ -27,7 +27,13 @@ async def get_site_details(site_id: str, settings: Settings) -> dict[str, Any]:
     async with UniFiClient(settings) as client:
         await client.authenticate()
 
-        response = await client.get("/ea/sites")
+        # Use appropriate endpoint based on API type
+        if settings.api_type.value == "local":
+            endpoint = settings.get_integration_path("sites")
+        else:
+            endpoint = "/ea/sites"
+
+        response = await client.get(endpoint)
 
         # Handle both local and cloud API response formats
         if isinstance(response, list):

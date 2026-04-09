@@ -140,6 +140,34 @@ class UniFiClient:
         if endpoint == "/ea/sites":
             return "/proxy/network/integration/v1/sites"
 
+        # Special case: Integration API endpoints that don't exist on local gateways
+        # These need to be translated to equivalent local endpoints or handled specially
+        if endpoint.startswith("/integration/v1/sites/"):
+            # Extract site_id and the rest of the path
+            import re
+
+            match = re.match(r"^/integration/v1/sites/([^/]+)/(.+)$", endpoint)
+            if match:
+                site_id, integration_path = match.groups()
+                # Translate UUID to site name if we have the mapping
+                site_name = self._site_uuid_to_name.get(site_id, site_id)
+                if site_id != site_name:
+                    self.logger.debug(f"Translated site ID: {site_id} -> {site_name}")
+
+                # Map integration API paths to local equivalents
+                integration_mapping = {
+                    "acls": "rest/firewallrule",  # ACLs -> firewall rules on local
+                    "traffic-matching-lists": "rest/firewallgroup",  # Traffic matching lists -> firewall groups
+                }
+
+                local_path = integration_mapping.get(integration_path, integration_path)
+                if integration_path != local_path:
+                    self.logger.debug(
+                        f"Translated integration path: {integration_path} -> {local_path}"
+                    )
+
+                return f"/proxy/network/api/s/{site_name}/{local_path}"
+
         # Pattern: /ea/sites/{site_id}/{rest_of_path}
         # Transform to: /proxy/network/api/s/{site_name}/{local_path}
         # Note: Local API uses site names (e.g., 'default'), not UUIDs
@@ -158,6 +186,7 @@ class UniFiClient:
                 "devices": "stat/device",
                 "sta": "stat/sta",  # clients
                 "rest/networkconf": "rest/networkconf",  # VLANs/networks
+                "rest/firewallrule": "rest/firewallrule",  # Firewall rules
             }
 
             local_path = path_mapping.get(cloud_path, cloud_path)

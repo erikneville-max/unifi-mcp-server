@@ -41,7 +41,10 @@ async def list_traffic_matching_lists(
         await client.authenticate()
 
         response = await client.get(f"/integration/v1/sites/{site_id}/traffic-matching-lists")
-        lists_data: list[dict[str, Any]] = response.get("data", [])
+        # Handle both cloud (dict with "data" key) and local (direct list) response formats
+        lists_data: list[dict[str, Any]] = (
+            response if isinstance(response, list) else response.get("data", [])
+        )
 
         # Apply pagination
         paginated = lists_data[offset : offset + limit]
