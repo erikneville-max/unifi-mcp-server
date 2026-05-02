@@ -375,7 +375,8 @@ async def list_firewall_policies(
         if not client.is_authenticated:
             await client.authenticate()
 
-        endpoint = f"{settings.get_v2_api_path(site_id)}/firewall-policies"
+        normalized_site_id = client._site_uuid_to_name.get(site_id, site_id)
+        endpoint = f"{settings.get_v2_api_path(normalized_site_id)}/firewall-policies"
         response = await client.get(endpoint)
 
         policies_data = response if isinstance(response, list) else response.get("data", [])
@@ -885,6 +886,9 @@ async def update_firewall_policy(
         if not client.is_authenticated:
             await client.authenticate()
 
+        # Normalize site UUID to short-name for API endpoint (Bug #73)
+        normalized_site_id = client._site_uuid_to_name.get(site_id, site_id)
+
         # Resolve zone identifiers to internal _ids (accepts name, UUID, or
         # ObjectId — same flexibility as create_firewall_policy).
         if source_zone_id is not None:
@@ -896,7 +900,7 @@ async def update_firewall_policy(
                 client, settings, site_id, destination_zone_id
             )
 
-        endpoint = f"{settings.get_v2_api_path(site_id)}/firewall-policies/{policy_id}"
+        endpoint = f"{settings.get_v2_api_path(normalized_site_id)}/firewall-policies/{policy_id}"
 
         # Fetch the existing policy so we can merge + PUT the full object.
         try:
