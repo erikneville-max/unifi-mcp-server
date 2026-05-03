@@ -77,7 +77,7 @@ repos:
           - types-redis
           - pydantic>=2.0.0
         args: [--ignore-missing-imports, --show-error-codes]
-        exclude: ^tests/
+        exclude: '^(tests/|\\.claude/|\\.memsearch/|\\.omc/|\\.serena/)'
 
   # Security checks with Bandit
   - repo: https://github.com/PyCQA/bandit
