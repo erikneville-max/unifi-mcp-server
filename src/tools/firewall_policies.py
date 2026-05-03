@@ -893,11 +893,11 @@ async def update_firewall_policy(
         # ObjectId — same flexibility as create_firewall_policy).
         if source_zone_id is not None:
             source_target_overrides["zone_id"] = await _resolve_zone_id(
-                client, settings, site_id, source_zone_id
+                client, settings, normalized_site_id, source_zone_id
             )
         if destination_zone_id is not None:
             destination_target_overrides["zone_id"] = await _resolve_zone_id(
-                client, settings, site_id, destination_zone_id
+                client, settings, normalized_site_id, destination_zone_id
             )
 
         endpoint = f"{settings.get_v2_api_path(normalized_site_id)}/firewall-policies/{policy_id}"
