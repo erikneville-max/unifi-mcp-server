@@ -76,7 +76,7 @@ repos:
           - types-requests
           - types-redis
           - pydantic>=2.0.0
-        args: [--ignore-missing-imports, --show-error-codes]
+        args: [--ignore-missing-imports, --show-error-codes, src]
         exclude: '^(tests/|\\.claude/|\\.memsearch/|\\.omc/|\\.serena/)'
 
   # Security checks with Bandit
