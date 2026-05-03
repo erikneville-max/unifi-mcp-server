@@ -232,8 +232,8 @@ class TestListFirewallPolicies:
         Bug #72 (FIXED): The MatchingTarget enum now includes the 'APP' value that
         real UniFi controllers return. This test verifies the fix works correctly.
         """
-        from src.tools.firewall_policies import list_firewall_policies
         from src.models.firewall_policy import MatchingTarget
+        from src.tools.firewall_policies import list_firewall_policies
 
         # API response with matching_target='APP' that previously caused validation error
         policy_with_app_target = [

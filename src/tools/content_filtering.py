@@ -51,7 +51,9 @@ async def list_content_filters(
 
         try:
             normalized_site_id = client._site_uuid_to_name.get(site_id, site_id)
-            response = await client.get(f"{settings.get_v2_api_path(normalized_site_id)}/content-filtering")
+            response = await client.get(
+                f"{settings.get_v2_api_path(normalized_site_id)}/content-filtering"
+            )
         except APIError:
             logger.exception(
                 sanitize_log_message(f"Failed to list content filters for site {site_id}")
