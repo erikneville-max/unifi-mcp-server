@@ -19,6 +19,7 @@ _zone_cache: dict[str, dict[str, str]] = {}
 
 _VALID_IP_VERSIONS = ("IPV4", "IPV6", "BOTH")
 _VALID_PORT_MATCHING_TYPES = ("ANY", "SPECIFIC", "OBJECT")
+_VALID_CONNECTION_STATE_TYPES = ("ALL", "RESPOND_ONLY", "CUSTOM")
 
 
 def _build_match_target(
@@ -507,6 +508,12 @@ async def create_firewall_policy(
     description: str | None = None,
     ip_version: str = "BOTH",
     create_allow_respond: bool | None = None,
+    icmp_typename: str | None = None,
+    icmp_v6_typename: str | None = None,
+    match_ip_sec: bool | None = None,
+    match_opposite_protocol: bool | None = None,
+    connection_state_type: str = "ALL",
+    connection_states: list[str] | None = None,
     confirm: bool | str = False,
     dry_run: bool | str = False,
 ) -> dict[str, Any]:
@@ -563,6 +570,16 @@ async def create_firewall_policy(
         ip_version: IPV4, IPV6, or BOTH (required by API; defaults to BOTH)
         create_allow_respond: When True, automatically create a paired ALLOW
             RESPOND rule for stateful TCP/UDP sessions.
+        icmp_typename: ICMP type name filter (e.g. "ANY", "echo"). Only
+            meaningful when ``protocol`` is ``icmpv6`` or similar.
+        icmp_v6_typename: ICMPv6 type name filter (e.g. "ANY", "echo-request").
+        match_ip_sec: When True, match only IPsec-encapsulated traffic.
+        match_opposite_protocol: When True, invert the protocol match.
+        connection_state_type: Connection state matching mode — ALL (default),
+            RESPOND_ONLY, or CUSTOM. Use CUSTOM with ``connection_states``.
+        connection_states: List of conntrack states to match when
+            ``connection_state_type="CUSTOM"`` (e.g. ``["NEW", "ESTABLISHED",
+            "RELATED", "INVALID"]``). Must be non-empty when type is CUSTOM.
         confirm: REQUIRED True for mutating operations
         dry_run: Preview changes without applying
 
@@ -585,6 +602,17 @@ async def create_firewall_policy(
     if ip_version_upper not in _VALID_IP_VERSIONS:
         raise ValueError(
             f"Invalid ip_version '{ip_version}'. Must be one of: {list(_VALID_IP_VERSIONS)}"
+        )
+
+    connection_state_type = connection_state_type.upper()
+    if connection_state_type not in _VALID_CONNECTION_STATE_TYPES:
+        raise ValueError(
+            f"Invalid connection_state_type '{connection_state_type}'. "
+            f"Must be one of: {', '.join(_VALID_CONNECTION_STATE_TYPES)}"
+        )
+    if connection_state_type == "CUSTOM" and not connection_states:
+        raise ValueError(
+            "connection_states must be non-empty when connection_state_type is 'CUSTOM'"
         )
 
     # Coerce string inputs ("true"/"false") to real booleans — MCP clients
@@ -673,6 +701,12 @@ async def create_firewall_policy(
                 enabled=enabled,
                 protocol=protocol,
                 ip_version=ip_version_upper,
+                connection_state_type=connection_state_type,
+                connection_states=connection_states or [],
+                icmp_typename=icmp_typename,
+                icmp_v6_typename=icmp_v6_typename,
+                match_ip_sec=match_ip_sec,
+                match_opposite_protocol=match_opposite_protocol,
                 source=source_config,
                 destination=destination_config,
                 description=description,
@@ -762,6 +796,12 @@ async def update_firewall_policy(
     source_match_opposite_ips: bool | None = None,
     destination_match_opposite_ips: bool | None = None,
     create_allow_respond: bool | None = None,
+    icmp_typename: str | None = None,
+    icmp_v6_typename: str | None = None,
+    match_ip_sec: bool | None = None,
+    match_opposite_protocol: bool | None = None,
+    connection_state_type: str | None = None,
+    connection_states: list[str] | None = None,
     confirm: bool | str = False,
     dry_run: bool | str = False,
 ) -> dict[str, Any]:
@@ -789,6 +829,8 @@ async def update_firewall_policy(
         ip_version: IPV4 / IPV6 / BOTH
         protocol: Transport protocol (all, tcp, udp, tcp_udp, icmpv6)
         description: Free-form description
+        source_zone_id: Override source zone (name, UUID, or internal ObjectId).
+        destination_zone_id: Override destination zone.
         source_port: Source port — single port "53" or range "9000-9010".
             Auto-sets ``source_port_matching_type=SPECIFIC``.
         destination_port: Destination port — same format as source_port.
@@ -813,6 +855,16 @@ async def update_firewall_policy(
         source_match_opposite_ips: Invert the source IP match (NOT)
         destination_match_opposite_ips: Invert the destination IP match
         create_allow_respond: Create a paired stateful respond rule
+        icmp_typename: ICMP type name filter (e.g. "ANY", "echo"). Only
+            meaningful when ``protocol`` is icmp-related.
+        icmp_v6_typename: ICMPv6 type name filter (e.g. "ANY", "echo-request").
+        match_ip_sec: When True, match only IPsec-encapsulated traffic.
+        match_opposite_protocol: When True, invert the protocol match.
+        connection_state_type: Connection state matching mode — ALL,
+            RESPOND_ONLY, or CUSTOM. Use CUSTOM with ``connection_states``.
+        connection_states: List of conntrack states to match when
+            ``connection_state_type="CUSTOM"`` (e.g. ``["NEW", "ESTABLISHED",
+            "RELATED", "INVALID"]``). Must be non-empty when type is CUSTOM.
         confirm: REQUIRED True for mutating operations
         dry_run: Preview changes without applying
 
@@ -855,6 +907,23 @@ async def update_firewall_policy(
             f"Invalid protocol '{protocol}'. Must be one of: all, icmpv6, tcp, tcp_udp, udp."
         )
 
+    connection_state_type_upper: str | None = None
+    if connection_state_type is not None:
+        connection_state_type_upper = connection_state_type.upper()
+        if connection_state_type_upper not in _VALID_CONNECTION_STATE_TYPES:
+            raise ValueError(
+                f"Invalid connection_state_type '{connection_state_type}'. "
+                f"Must be one of: {', '.join(_VALID_CONNECTION_STATE_TYPES)}"
+            )
+        if connection_state_type_upper == "CUSTOM" and not connection_states:
+            raise ValueError(
+                "connection_states must be non-empty when connection_state_type is 'CUSTOM'"
+            )
+    if connection_states and connection_state_type is None:
+        raise ValueError(
+            "connection_state_type='CUSTOM' is required when connection_states is provided"
+        )
+
     # Collect top-level overrides so we can both preview them and merge them.
     overrides: dict[str, Any] = {}
     if name is not None:
@@ -873,6 +942,17 @@ async def update_firewall_policy(
         overrides["description"] = description
     if create_allow_respond is not None:
         overrides["create_allow_respond"] = create_allow_respond
+    if icmp_typename is not None:
+        overrides["icmp_typename"] = icmp_typename
+    if icmp_v6_typename is not None:
+        overrides["icmp_v6_typename"] = icmp_v6_typename
+    if match_ip_sec is not None:
+        overrides["match_ip_sec"] = match_ip_sec
+    if match_opposite_protocol is not None:
+        overrides["match_opposite_protocol"] = match_opposite_protocol
+    if connection_state_type_upper is not None:
+        overrides["connection_state_type"] = connection_state_type_upper
+        overrides["connection_states"] = connection_states or []
 
     # Validate / collect port overrides; these merge into the source and
     # destination sub-dicts inside the policy, not as top-level fields.

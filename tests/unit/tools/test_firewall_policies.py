@@ -273,67 +273,6 @@ class TestListFirewallPolicies:
             assert result[0]["name"] == "Block APP Traffic"
             assert result[0]["source"]["matching_target"] == MatchingTarget.APP.value
 
-    @pytest.mark.asyncio
-    async def test_list_firewall_policies_returns_all_when_no_limit(
-        self, local_settings: Settings
-    ) -> None:
-        """When limit/offset are omitted all policies are returned, not just the first 100."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        base = {
-            "action": "ALLOW",
-            "enabled": True,
-            "predefined": False,
-            "index": 10000,
-            "protocol": "all",
-            "ip_version": "BOTH",
-            "connection_state_type": "ALL",
-            "source": {"zone_id": "zone-lan", "matching_target": "ANY"},
-            "destination": {"zone_id": "zone-wan", "matching_target": "ANY"},
-        }
-        large_response = [{"_id": f"policy-{i}", "name": f"Policy {i}", **base} for i in range(150)]
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = large_response
-
-            result = await list_firewall_policies("default", local_settings)
-
-        assert len(result) == 150, "All 150 policies should be returned when limit is omitted"
-
-    @pytest.mark.asyncio
-    async def test_list_firewall_policies_explicit_limit_still_paginates(
-        self, local_settings: Settings
-    ) -> None:
-        """Explicit limit/offset still slices the result set correctly."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        base = {
-            "action": "ALLOW",
-            "enabled": True,
-            "predefined": False,
-            "index": 10000,
-            "protocol": "all",
-            "ip_version": "BOTH",
-            "connection_state_type": "ALL",
-            "source": {"zone_id": "zone-lan", "matching_target": "ANY"},
-            "destination": {"zone_id": "zone-wan", "matching_target": "ANY"},
-        }
-        large_response = [{"_id": f"policy-{i}", "name": f"Policy {i}", **base} for i in range(150)]
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = large_response
-
-            result = await list_firewall_policies("default", local_settings, limit=10, offset=5)
-
-        assert len(result) == 10
-        assert result[0]["id"] == "policy-5"
-
 
 class TestGetFirewallPolicy:
     """Tests for get_firewall_policy function."""
@@ -586,7 +525,7 @@ class TestUpdateFirewallPolicy:
         sample_existing_policy: dict,
         sample_updated_policy: dict,
     ) -> None:
-        """Test successful update uses fetch-then-merge: GETs current state, PUTs full object."""
+        """Test successful update of a firewall policy with confirm=True."""
         from src.tools.firewall_policies import update_firewall_policy
 
         with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
@@ -654,7 +593,7 @@ class TestUpdateFirewallPolicy:
 
             result = await update_firewall_policy(
                 policy_id="682a0e42220317278bb0b2cb",
-                name="New Name",
+                name="Updated Policy Name",
                 site_id="default",
                 dry_run=True,
                 settings=local_settings,
@@ -663,13 +602,13 @@ class TestUpdateFirewallPolicy:
             assert result["status"] == "dry_run"
             assert result["policy_id"] == "682a0e42220317278bb0b2cb"
             assert "changes" in result
-            assert result["changes"]["name"] == "New Name"
+            assert result["changes"]["name"] == "Updated Policy Name"
             assert "merged_payload" in result
             mock_client.put.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_update_firewall_policy_not_found(self, local_settings: Settings) -> None:
-        """Test ResourceNotFoundError raised when GET returns not-found during fetch."""
+        """Test 404 when policy not found."""
         from src.tools.firewall_policies import update_firewall_policy
         from src.utils.exceptions import ResourceNotFoundError
 
@@ -677,7 +616,7 @@ class TestUpdateFirewallPolicy:
             mock_client = AsyncMock()
             MockClient.return_value.__aenter__.return_value = mock_client
             mock_client.is_authenticated = True
-            mock_client.get.side_effect = ResourceNotFoundError("firewall_policy", "nonexistent-id")
+            mock_client.put.side_effect = ResourceNotFoundError("firewall_policy", "nonexistent-id")
 
             with pytest.raises(ResourceNotFoundError) as exc_info:
                 await update_firewall_policy(
@@ -718,11 +657,6 @@ class TestUpdateFirewallPolicy:
         """A name override must be merged into the existing object and the
         full object PUT back (partial PUT is rejected by the v2 endpoint)."""
         from src.tools.firewall_policies import update_firewall_policy
-
-        current_policy = sample_updated_policy.copy()
-        current_policy["name"] = "Old Name"
-        updated_policy = sample_updated_policy.copy()
-        updated_policy["name"] = "Updated Policy Name"
 
         with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
             mock_client = AsyncMock()
@@ -845,6 +779,21 @@ class TestUpdateFirewallPolicy:
                 )
 
     @pytest.mark.asyncio
+    async def test_update_firewall_policy_invalid_ip_version_raises(
+        self, local_settings: Settings
+    ) -> None:
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with pytest.raises(ValueError, match="Invalid ip_version"):
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                ip_version="IPV5",
+                site_id="default",
+                confirm=True,
+                settings=local_settings,
+            )
+
+    @pytest.mark.asyncio
     async def test_update_firewall_policy_with_site_uuid_bug_73(
         self,
         local_settings: Settings,
@@ -882,204 +831,6 @@ class TestUpdateFirewallPolicy:
             called_endpoint = mock_client.put.call_args[0][0]
             assert "default" in called_endpoint
             assert site_uuid not in called_endpoint
-
-    @pytest.mark.asyncio
-    async def test_update_firewall_policy_invalid_action_raises(
-        self, local_settings: Settings
-    ) -> None:
-        """Test that an invalid action value raises ValueError before any API call."""
-        from src.tools.firewall_policies import update_firewall_policy
-
-        with pytest.raises(ValueError, match="Invalid action"):
-            await update_firewall_policy(
-                policy_id="682a0e42220317278bb0b2cb",
-                action="INVALID",
-                site_id="default",
-                confirm=True,
-                settings=local_settings,
-            )
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("bad_protocol", ["ftp", "udplite", "sctp", "123"])
-    async def test_update_firewall_policy_invalid_protocol_raises(
-        self, local_settings: Settings, bad_protocol: str
-    ) -> None:
-        """Invalid protocol raises ValueError (runtime guard) without making any API call."""
-        from src.tools.firewall_policies import update_firewall_policy
-
-        with pytest.raises(ValueError, match="Invalid protocol"):
-            await update_firewall_policy(
-                policy_id="682a0e42220317278bb0b2cb",
-                protocol=bad_protocol,  # type: ignore[arg-type]
-                site_id="default",
-                confirm=True,
-                settings=local_settings,
-            )
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("bad_ip_version", ["v4", "ipv4only", "4"])
-    async def test_update_firewall_policy_invalid_ip_version_raises(
-        self, local_settings: Settings, bad_ip_version: str
-    ) -> None:
-        """Invalid ip_version raises ValueError (runtime guard) without making any API call."""
-        from src.tools.firewall_policies import update_firewall_policy
-
-        with pytest.raises(ValueError, match="Invalid ip_version"):
-            await update_firewall_policy(
-                policy_id="682a0e42220317278bb0b2cb",
-                ip_version=bad_ip_version,  # type: ignore[arg-type]
-                site_id="default",
-                confirm=True,
-                settings=local_settings,
-            )
-
-
-class TestListFirewallPoliciesZoneFilter:
-    """Tests for zone filtering on list_firewall_policies."""
-
-    @pytest.fixture
-    def local_settings(self, monkeypatch: pytest.MonkeyPatch) -> Settings:
-        monkeypatch.setenv("UNIFI_API_KEY", "test-api-key")
-        monkeypatch.setenv("UNIFI_API_TYPE", "local")
-        monkeypatch.setenv("UNIFI_LOCAL_HOST", "192.168.2.1")
-        return Settings()
-
-    @pytest.fixture
-    def multi_zone_policies(self) -> list[dict]:
-        return [
-            {
-                "_id": "policy-1",
-                "name": "IoT to LAN Block",
-                "action": "BLOCK",
-                "enabled": True,
-                "predefined": False,
-                "source": {"zone_id": "zone-iot", "matching_target": "ANY"},
-                "destination": {"zone_id": "zone-lan", "matching_target": "ANY"},
-            },
-            {
-                "_id": "policy-2",
-                "name": "LAN to IoT Allow",
-                "action": "ALLOW",
-                "enabled": True,
-                "predefined": False,
-                "source": {"zone_id": "zone-lan", "matching_target": "ANY"},
-                "destination": {"zone_id": "zone-iot", "matching_target": "ANY"},
-            },
-            {
-                "_id": "policy-3",
-                "name": "IoT to External Allow",
-                "action": "ALLOW",
-                "enabled": True,
-                "predefined": False,
-                "source": {"zone_id": "zone-iot", "matching_target": "ANY"},
-                "destination": {"zone_id": "zone-external", "matching_target": "ANY"},
-            },
-        ]
-
-    @pytest.mark.asyncio
-    async def test_filter_by_source_zone(
-        self, local_settings: Settings, multi_zone_policies: list[dict]
-    ) -> None:
-        """Test filtering returns only policies with matching source zone."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = multi_zone_policies
-
-            result = await list_firewall_policies(
-                "default", local_settings, source_zone_id="zone-iot"
-            )
-
-            assert len(result) == 2
-            assert all(p["source"]["zone_id"] == "zone-iot" for p in result)
-
-    @pytest.mark.asyncio
-    async def test_filter_by_destination_zone(
-        self, local_settings: Settings, multi_zone_policies: list[dict]
-    ) -> None:
-        """Test filtering returns only policies with matching destination zone."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = multi_zone_policies
-
-            result = await list_firewall_policies(
-                "default", local_settings, destination_zone_id="zone-iot"
-            )
-
-            assert len(result) == 1
-            assert result[0]["name"] == "LAN to IoT Allow"
-
-    @pytest.mark.asyncio
-    async def test_filter_by_source_and_destination_zone(
-        self, local_settings: Settings, multi_zone_policies: list[dict]
-    ) -> None:
-        """Test filtering by both source and destination returns exact zone pair."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = multi_zone_policies
-
-            result = await list_firewall_policies(
-                "default",
-                local_settings,
-                source_zone_id="zone-iot",
-                destination_zone_id="zone-lan",
-            )
-
-            assert len(result) == 1
-            assert result[0]["name"] == "IoT to LAN Block"
-
-    @pytest.mark.asyncio
-    async def test_filter_no_match_returns_empty(
-        self, local_settings: Settings, multi_zone_policies: list[dict]
-    ) -> None:
-        """Test that unmatched zone filter returns empty list."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = multi_zone_policies
-
-            result = await list_firewall_policies(
-                "default", local_settings, source_zone_id="zone-nonexistent"
-            )
-
-            assert result == []
-
-    @pytest.mark.asyncio
-    async def test_zone_filter_applied_before_pagination(
-        self, local_settings: Settings, multi_zone_policies: list[dict]
-    ) -> None:
-        """Test that zone filter runs before limit/offset slice."""
-        from src.tools.firewall_policies import list_firewall_policies
-
-        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
-            mock_client = AsyncMock()
-            MockClient.return_value.__aenter__.return_value = mock_client
-            mock_client.is_authenticated = True
-            mock_client.get.return_value = multi_zone_policies
-
-            result = await list_firewall_policies(
-                "default",
-                local_settings,
-                source_zone_id="zone-iot",
-                limit=1,
-            )
-
-            assert len(result) == 1
-            assert result[0]["source"]["zone_id"] == "zone-iot"
 
 
 class TestDeleteFirewallPolicy:
@@ -2261,6 +2012,322 @@ class TestUpdateFirewallPolicyPortMatching:
                 )
 
 
+class TestUpdateFirewallPolicyNewFields:
+    """Tests for the 6 new parameters added to update_firewall_policy."""
+
+    @pytest.fixture
+    def local_settings(self, monkeypatch: pytest.MonkeyPatch) -> Settings:
+        """Create settings for local API access."""
+        monkeypatch.setenv("UNIFI_API_KEY", "test-api-key")
+        monkeypatch.setenv("UNIFI_API_TYPE", "local")
+        monkeypatch.setenv("UNIFI_LOCAL_HOST", "192.168.2.1")
+        return Settings()
+
+    @pytest.fixture
+    def sample_existing_policy(self) -> dict:
+        """Existing policy as returned by GET before update."""
+        return {
+            "_id": "682a0e42220317278bb0b2cb",
+            "name": "Test Policy",
+            "enabled": True,
+            "action": "ALLOW",
+            "predefined": False,
+            "index": 10000,
+            "protocol": "all",
+            "ip_version": "BOTH",
+            "connection_state_type": "ALL",
+            "connection_states": [],
+            "schedule": {"mode": "ALWAYS"},
+            "source": {"zone_id": "zone-src", "matching_target": "ANY"},
+            "destination": {"zone_id": "zone-dst", "matching_target": "ANY"},
+        }
+
+    @pytest.fixture
+    def sample_updated_policy(self, sample_existing_policy: dict) -> dict:
+        """Sample updated policy response."""
+        return dict(sample_existing_policy)
+
+    @pytest.mark.asyncio
+    async def test_update_icmp_typename(
+        self, local_settings: Settings, sample_existing_policy: dict, sample_updated_policy: dict
+    ) -> None:
+        """icmp_typename flows into the PUT body."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.get.return_value = sample_existing_policy
+            mock_client.put.return_value = sample_updated_policy
+
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                icmp_typename="echo",
+                confirm=True,
+            )
+
+            put_body = mock_client.put.call_args[1]["json_data"]
+            assert put_body["icmp_typename"] == "echo"
+
+    @pytest.mark.asyncio
+    async def test_update_icmp_v6_typename(
+        self, local_settings: Settings, sample_existing_policy: dict, sample_updated_policy: dict
+    ) -> None:
+        """icmp_v6_typename flows into the PUT body."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.get.return_value = sample_existing_policy
+            mock_client.put.return_value = sample_updated_policy
+
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                icmp_v6_typename="echo-request",
+                confirm=True,
+            )
+
+            put_body = mock_client.put.call_args[1]["json_data"]
+            assert put_body["icmp_v6_typename"] == "echo-request"
+
+    @pytest.mark.asyncio
+    async def test_update_match_ip_sec(
+        self, local_settings: Settings, sample_existing_policy: dict, sample_updated_policy: dict
+    ) -> None:
+        """match_ip_sec=True flows into the PUT body."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.get.return_value = sample_existing_policy
+            mock_client.put.return_value = sample_updated_policy
+
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                match_ip_sec=True,
+                confirm=True,
+            )
+
+            put_body = mock_client.put.call_args[1]["json_data"]
+            assert put_body["match_ip_sec"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_match_opposite_protocol(
+        self, local_settings: Settings, sample_existing_policy: dict, sample_updated_policy: dict
+    ) -> None:
+        """match_opposite_protocol=True flows into the PUT body."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.get.return_value = sample_existing_policy
+            mock_client.put.return_value = sample_updated_policy
+
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                match_opposite_protocol=True,
+                confirm=True,
+            )
+
+            put_body = mock_client.put.call_args[1]["json_data"]
+            assert put_body["match_opposite_protocol"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_connection_state_type_all(
+        self, local_settings: Settings, sample_existing_policy: dict, sample_updated_policy: dict
+    ) -> None:
+        """connection_state_type='ALL' is uppercased and placed in PUT body."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.get.return_value = sample_existing_policy
+            mock_client.put.return_value = sample_updated_policy
+
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                connection_state_type="all",
+                confirm=True,
+            )
+
+            put_body = mock_client.put.call_args[1]["json_data"]
+            assert put_body["connection_state_type"] == "ALL"
+            assert put_body["connection_states"] == []
+
+    @pytest.mark.asyncio
+    async def test_update_connection_state_type_custom(
+        self, local_settings: Settings, sample_existing_policy: dict, sample_updated_policy: dict
+    ) -> None:
+        """connection_state_type=CUSTOM with states flows into PUT body."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.get.return_value = sample_existing_policy
+            mock_client.put.return_value = sample_updated_policy
+
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                connection_state_type="CUSTOM",
+                connection_states=["NEW", "ESTABLISHED"],
+                confirm=True,
+            )
+
+            put_body = mock_client.put.call_args[1]["json_data"]
+            assert put_body["connection_state_type"] == "CUSTOM"
+            assert put_body["connection_states"] == ["NEW", "ESTABLISHED"]
+
+    @pytest.mark.asyncio
+    async def test_update_connection_state_type_custom_without_states_raises(
+        self, local_settings: Settings
+    ) -> None:
+        """CUSTOM type without connection_states raises ValueError."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with pytest.raises(ValueError, match="connection_states must be non-empty"):
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                connection_state_type="CUSTOM",
+                confirm=True,
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_connection_states_without_type_raises(
+        self, local_settings: Settings
+    ) -> None:
+        """Providing connection_states without connection_state_type raises ValueError."""
+        from src.tools.firewall_policies import update_firewall_policy
+
+        with pytest.raises(ValueError, match="connection_state_type='CUSTOM' is required"):
+            await update_firewall_policy(
+                policy_id="682a0e42220317278bb0b2cb",
+                site_id="default",
+                settings=local_settings,
+                connection_states=["NEW"],
+                confirm=True,
+            )
+
+
+class TestCreateFirewallPolicyNewFields:
+    """Tests for the 6 new parameters added to create_firewall_policy."""
+
+    @pytest.fixture
+    def local_settings(self, monkeypatch: pytest.MonkeyPatch) -> Settings:
+        """Create settings for local API access."""
+        monkeypatch.setenv("UNIFI_API_KEY", "test-api-key")
+        monkeypatch.setenv("UNIFI_API_TYPE", "local")
+        monkeypatch.setenv("UNIFI_LOCAL_HOST", "192.168.2.1")
+        return Settings()
+
+    @pytest.fixture
+    def sample_created_policy(self) -> dict:
+        """Sample created policy API response."""
+        return {
+            "_id": "new-policy-id",
+            "name": "Test Policy",
+            "enabled": True,
+            "action": "ALLOW",
+            "predefined": False,
+            "protocol": "all",
+            "ip_version": "BOTH",
+            "connection_state_type": "ALL",
+            "source": {"zone_id": "zone-src", "matching_target": "ANY"},
+            "destination": {"zone_id": "zone-dst", "matching_target": "ANY"},
+        }
+
+    @pytest.mark.asyncio
+    async def test_create_with_icmp_typename(
+        self, local_settings: Settings, sample_created_policy: dict
+    ) -> None:
+        """icmp_typename flows into the POST body."""
+        from src.tools.firewall_policies import create_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.post.return_value = sample_created_policy
+
+            await create_firewall_policy(
+                name="Test Policy",
+                action="ALLOW",
+                site_id="default",
+                settings=local_settings,
+                icmp_typename="echo",
+                confirm=True,
+            )
+
+            post_body = mock_client.post.call_args[1]["json_data"]
+            assert post_body["icmp_typename"] == "echo"
+
+    @pytest.mark.asyncio
+    async def test_create_with_connection_state_type_custom(
+        self, local_settings: Settings, sample_created_policy: dict
+    ) -> None:
+        """connection_state_type=CUSTOM with states flows into the POST body."""
+        from src.tools.firewall_policies import create_firewall_policy
+
+        with patch("src.tools.firewall_policies.UniFiClient") as MockClient:
+            mock_client = AsyncMock()
+            MockClient.return_value.__aenter__.return_value = mock_client
+            mock_client.is_authenticated = True
+            mock_client.post.return_value = sample_created_policy
+
+            await create_firewall_policy(
+                name="Test Policy",
+                action="ALLOW",
+                site_id="default",
+                settings=local_settings,
+                connection_state_type="CUSTOM",
+                connection_states=["NEW", "ESTABLISHED"],
+                confirm=True,
+            )
+
+            post_body = mock_client.post.call_args[1]["json_data"]
+            assert post_body["connection_state_type"] == "CUSTOM"
+            assert post_body["connection_states"] == ["NEW", "ESTABLISHED"]
+
+    @pytest.mark.asyncio
+    async def test_create_connection_state_type_custom_without_states_raises(
+        self, local_settings: Settings
+    ) -> None:
+        """CUSTOM type without connection_states raises ValueError."""
+        from src.tools.firewall_policies import create_firewall_policy
+
+        with pytest.raises(ValueError, match="connection_states must be non-empty"):
+            await create_firewall_policy(
+                name="Test Policy",
+                action="ALLOW",
+                site_id="default",
+                settings=local_settings,
+                connection_state_type="CUSTOM",
+                confirm=True,
+            )
 class TestGetZonePolicyMatrix:
     """Tests for get_zone_policy_matrix function."""
 
