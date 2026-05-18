@@ -1,12 +1,13 @@
 """Firewall policies management tools for UniFi v2 API."""
 
-from typing import Any
+import asyncio
+from typing import Any, Literal
 
 from ..api.client import UniFiClient
 from ..config import APIType, Settings
 from ..models.firewall_policy import FirewallPolicy, FirewallPolicyCreate, FirewallZoneV2Mapping
 from ..utils import APIError, ResourceNotFoundError, get_logger, log_audit, sanitize_log_message
-from ..utils.validators import coerce_bool
+from ..utils.validators import coerce_bool, validate_limit_offset
 
 logger = get_logger(__name__)
 
@@ -82,7 +83,7 @@ def _build_match_target(
     # an incomplete payload and reject it, so fail fast here.
     if resolved_mt == "SPECIFIC" and not port:
         raise ValueError(
-            "port_matching_type='SPECIFIC' requires a 'port' value " "(e.g. '53' or '9000-9010')."
+            "port_matching_type='SPECIFIC' requires a 'port' value (e.g. '53' or '9000-9010')."
         )
     if resolved_mt == "OBJECT" and not port_group_id:
         raise ValueError(
@@ -261,8 +262,11 @@ async def _load_zone_index(client: UniFiClient, settings: Settings, site_id: str
 async def _resolve_zone_id(
     client: UniFiClient, settings: Settings, site_id: str, identifier: str
 ) -> str:
-    """Resolve a zone name, external UUID, or internal ObjectId to the v2 API's
-    internal zone _id. Raises ValueError if no match."""
+    """Resolve a zone identifier to the v2 API's internal zone _id.
+
+    Accepts a zone name, external UUID, or internal ObjectId.
+    Raises ValueError if no match is found.
+    """
     if not identifier:
         raise ValueError("Zone identifier is required")
     index = _zone_cache.get(site_id) or await _load_zone_index(client, settings, site_id)
@@ -342,15 +346,28 @@ async def list_firewall_zones_v2(
 async def list_firewall_policies(
     site_id: str,
     settings: Settings,
+    limit: int | None = None,
+    offset: int | None = None,
+    source_zone_id: str | None = None,
+    destination_zone_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """List all firewall policies (Traffic & Firewall Rules) for a site.
 
     This tool fetches firewall policies from the UniFi v2 API endpoint.
     Only available with local gateway API (api_type="local").
 
+    The UniFi v2 API returns all policies in a single response (no server-side
+    pagination). When limit/offset are omitted, all matching policies are returned.
+    Use limit and offset to page through results client-side.
+
     Args:
         site_id: Site identifier (default: "default")
         settings: Application settings
+        limit: Maximum number of policies to return. When omitted, all matching
+            policies are returned.
+        offset: Number of policies to skip (only applied when limit is provided)
+        source_zone_id: Filter to policies with this source zone ID
+        destination_zone_id: Filter to policies with this destination zone ID
 
     Returns:
         List of firewall policy objects
@@ -377,7 +394,25 @@ async def list_firewall_policies(
 
         policies_data = response if isinstance(response, list) else response.get("data", [])
 
-        return [FirewallPolicy(**policy).model_dump() for policy in policies_data]
+        all_policies = [FirewallPolicy(**policy).model_dump() for policy in policies_data]
+
+        # Apply zone filters before pagination
+        if source_zone_id is not None:
+            all_policies = [
+                p for p in all_policies if p.get("source", {}).get("zone_id") == source_zone_id
+            ]
+        if destination_zone_id is not None:
+            all_policies = [
+                p
+                for p in all_policies
+                if p.get("destination", {}).get("zone_id") == destination_zone_id
+            ]
+
+        # Only paginate when the caller explicitly requests it
+        if limit is not None or offset is not None:
+            limit, offset = validate_limit_offset(limit, offset)
+            return all_policies[offset : offset + limit]
+        return all_policies
 
 
 async def get_firewall_policy(
@@ -526,6 +561,8 @@ async def create_firewall_policy(
         enabled: Whether policy is active
         description: Optional description
         ip_version: IPV4, IPV6, or BOTH (required by API; defaults to BOTH)
+        create_allow_respond: When True, automatically create a paired ALLOW
+            RESPOND rule for stateful TCP/UDP sessions.
         confirm: REQUIRED True for mutating operations
         dry_run: Preview changes without applying
 
@@ -700,7 +737,7 @@ async def update_firewall_policy(
     site_id: str = "default",
     settings: Settings = None,
     name: str | None = None,
-    action: str | None = None,
+    action: Literal["ALLOW", "BLOCK"] | None = None,
     enabled: bool | None = None,
     logging: bool | None = None,
     ip_version: str | None = None,
@@ -765,6 +802,17 @@ async def update_firewall_policy(
         destination_port_matching_type: Same as source_port_matching_type.
         source_match_opposite_ports: Invert the source port match (NOT)
         destination_match_opposite_ports: Invert the destination port match
+        source_zone_id: New source zone — name, UUID, or ObjectId
+        destination_zone_id: New destination zone — name, UUID, or ObjectId
+        source_ips: Replace source IP/CIDR list (sets matching_target=IP)
+        destination_ips: Replace destination IP/CIDR list
+        source_network_ids: Replace source network ID list
+        destination_network_ids: Replace destination network ID list
+        source_client_macs: Replace source MAC list
+        destination_client_macs: Replace destination MAC list
+        source_match_opposite_ips: Invert the source IP match (NOT)
+        destination_match_opposite_ips: Invert the destination IP match
+        create_allow_respond: Create a paired stateful respond rule
         confirm: REQUIRED True for mutating operations
         dry_run: Preview changes without applying
 
@@ -801,6 +849,11 @@ async def update_firewall_policy(
             raise ValueError(
                 f"Invalid ip_version '{ip_version}'. Must be one of: {list(_VALID_IP_VERSIONS)}"
             )
+
+    if protocol is not None and protocol.lower() not in {"all", "tcp", "udp", "tcp_udp", "icmpv6"}:
+        raise ValueError(
+            f"Invalid protocol '{protocol}'. Must be one of: all, icmpv6, tcp, tcp_udp, udp."
+        )
 
     # Collect top-level overrides so we can both preview them and merge them.
     overrides: dict[str, Any] = {}
@@ -1051,4 +1104,124 @@ async def delete_firewall_policy(
             "status": "success",
             "policy_id": policy_id,
             "action": "deleted",
+        }
+
+
+async def get_zone_policy_matrix(
+    site_id: str,
+    settings: Settings,
+) -> dict[str, Any]:
+    """Get a snapshot of the zone-based firewall policy matrix.
+
+    Fetches all firewall zones and all policies, then groups policies by
+    source/destination zone pair to give a full picture of the current
+    security posture.
+
+    Only available with local gateway API (api_type="local").
+
+    Note:
+        The v2 policies API uses MongoDB ObjectIDs for zone_id fields, while
+        the integration v1 zones API uses UUIDs. These two ID spaces cannot be
+        automatically joined — both are returned so you have both the zone names
+        (from v1) and the policy groupings (by v2 ObjectID). Use list_firewall_zones
+        alongside this result to identify which zone name corresponds to which zone_id.
+
+    Args:
+        site_id: Site identifier (default: "default")
+        settings: Application settings
+
+    Returns:
+        Dictionary with:
+        - zones: list of zone objects from the integration API (with names)
+        - matrix: list of zone-pair entries, each with source_zone_id,
+          destination_zone_id, policy_count, and policies list
+        - summary: counts of total zones, policies, and covered zone pairs
+
+    Raises:
+        NotImplementedError: When using cloud API
+    """
+    _ensure_local_api(settings)
+
+    async with UniFiClient(settings) as client:
+        logger.info(f"Building zone policy matrix for site {site_id}")
+
+        if not client.is_authenticated:
+            await client.authenticate()
+
+        # Resolve the site UUID required by the integration v1 zones endpoint
+        resolved_site_id = await client.resolve_site_id(site_id)
+
+        # Fetch zones (integration v1) and policies (v2) concurrently —
+        # the two requests are independent so we can run them in parallel.
+        zones_endpoint = settings.get_integration_path(f"sites/{resolved_site_id}/firewall/zones")
+        policies_endpoint = f"{settings.get_v2_api_path(site_id)}/firewall-policies"
+
+        zones_response, policies_response = await asyncio.gather(
+            client.get(zones_endpoint),
+            client.get(policies_endpoint),
+        )
+
+        zones_data = (
+            zones_response.get("data", []) if isinstance(zones_response, dict) else zones_response
+        )
+        policies_data = (
+            policies_response
+            if isinstance(policies_response, list)
+            else policies_response.get("data", [])
+        )
+
+        # Build zone summaries
+        zones = [
+            {
+                "id": z.get("id"),
+                "name": z.get("name"),
+                "network_count": len(z.get("networkIds", [])),
+            }
+            for z in zones_data
+        ]
+
+        # Group policies by (source_zone_id, destination_zone_id)
+        pairs: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        for policy in policies_data:
+            src = policy.get("source", {}).get("zone_id")
+            dst = policy.get("destination", {}).get("zone_id")
+            if not src or not dst:
+                continue
+            key = (src, dst)
+            if key not in pairs:
+                pairs[key] = []
+            pairs[key].append(
+                {
+                    "id": policy.get("_id"),
+                    "name": policy.get("name"),
+                    "action": policy.get("action"),
+                    "enabled": policy.get("enabled"),
+                    "predefined": policy.get("predefined", False),
+                }
+            )
+
+        matrix = [
+            {
+                "source_zone_id": src,
+                "destination_zone_id": dst,
+                "policy_count": len(policies),
+                "policies": policies,
+            }
+            for (src, dst), policies in sorted(pairs.items())
+        ]
+
+        return {
+            "zones": zones,
+            "matrix": matrix,
+            "summary": {
+                "total_zones": len(zones),
+                "total_policies": len(policies_data),
+                "zone_pairs_with_policies": len(matrix),
+            },
+            "note": (
+                "zone_ids in the matrix use v2 MongoDB ObjectIDs; "
+                "zone ids in the zones list use integration v1 UUIDs — "
+                "they cannot be automatically joined. "
+                "Use policy names and zone names to correlate manually."
+            ),
         }
