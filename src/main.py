@@ -150,11 +150,78 @@ _LOCAL_TOOL_MODULES = [
     wifi_tools,
 ]
 
+# ---------------------------------------------------------------------------
+# Profile-based module filtering (UNIFI_PROFILE env var)
+#
+# Set UNIFI_PROFILE to load only a subset of tools, reducing LLM context size.
+# Valid profiles: network, devices, security, system, minimal
+# Omit UNIFI_PROFILE (or set to "all") to load all tools for the API type.
+# ---------------------------------------------------------------------------
+
+_PROFILE_MODULES: dict[str, list[Any]] = {
+    "network": [
+        client_mgmt_tools,
+        clients_tools,
+        dhcp_tools,
+        dns_tools,
+        network_config_tools,
+        networks_tools,
+        vouchers_tools,
+        wans_tools,
+        wifi_tools,
+    ],
+    "devices": [
+        device_control_tools,
+        devices_tools,
+        diagnostics_tools,
+        port_profile_tools,
+        switching_tools,
+        topology_tools,
+    ],
+    "security": [
+        acls_tools,
+        content_filtering_tools,
+        firewall_tools,
+        firewall_groups_tools,
+        firewall_policies_tools,
+        firewall_zones_tools,
+        port_fwd_tools,
+        site_vpn_tools,
+        vpn_tools,
+    ],
+    "system": [
+        application_tools,
+        backups_tools,
+        dpi_tools,
+        dpi_new_tools,
+        qos_tools,
+        radius_tools,
+        ref_tools,
+        site_manager_tools,
+        sites_tools,
+        traffic_flows_tools,
+        tml_tools,
+    ],
+    "minimal": [
+        sites_tools,
+        clients_tools,
+        devices_tools,
+    ],
+}
+
+_active_profile = os.getenv("UNIFI_PROFILE", "").lower().strip()
+
 _TOOL_MODULES: list[Any] = []
 if settings.api_type in (APIType.CLOUD_V1, APIType.CLOUD_EA):
-    _TOOL_MODULES = list(_CLOUD_TOOL_MODULES)
+    _base_modules = list(_CLOUD_TOOL_MODULES)
+    if _active_profile and _active_profile not in ("all", ""):
+        _profile_set = set(_PROFILE_MODULES.get(_active_profile, []))
+        _base_modules = [m for m in _base_modules if m in _profile_set] or _base_modules
+    _TOOL_MODULES = _base_modules
     logger.info(
-        f"Cloud API mode ({settings.api_type.value}) - registering {_TOOL_MODULES} tool modules"
+        f"Cloud API mode ({settings.api_type.value})"
+        + (f", profile={_active_profile}" if _active_profile else "")
+        + f" - registering {len(_TOOL_MODULES)} tool module(s)"
     )
     # get_site_statistics calls /ea/sites/{id}/devices, /sta, /rest/networkconf
     # which all 404 on the live Cloud API
@@ -164,8 +231,17 @@ if settings.api_type in (APIType.CLOUD_V1, APIType.CLOUD_EA):
         else:
             register_module_tools(mcp, _module, settings)
 else:
-    _TOOL_MODULES = list(_CLOUD_TOOL_MODULES) + list(_LOCAL_TOOL_MODULES)
-    logger.info(f"Local API mode - registering {_TOOL_MODULES} tool modules")
+    _all_local = list(_CLOUD_TOOL_MODULES) + list(_LOCAL_TOOL_MODULES)
+    if _active_profile and _active_profile not in ("all", ""):
+        _profile_set = set(_PROFILE_MODULES.get(_active_profile, []))
+        _TOOL_MODULES = [m for m in _all_local if m in _profile_set] or _all_local
+    else:
+        _TOOL_MODULES = _all_local
+    logger.info(
+        f"Local API mode"
+        + (f", profile={_active_profile}" if _active_profile else "")
+        + f" - registering {len(_TOOL_MODULES)} tool module(s)"
+    )
     for _module in _TOOL_MODULES:
         register_module_tools(mcp, _module, settings)
 
@@ -339,6 +415,8 @@ def main() -> None:
     logger.info("Starting UniFi MCP Server...")
     logger.info(f"API Type: {settings.api_type.value}")
     logger.info(f"Base URL: {settings.base_url}")
+    if _active_profile:
+        logger.info(f"Profile: {_active_profile} ({len(_TOOL_MODULES)} module(s) active)")
 
     if settings.server_transport == TransportMode.STDIO:
         logger.info("Transport: stdio (default)")

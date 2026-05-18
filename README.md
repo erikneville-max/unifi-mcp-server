@@ -26,7 +26,7 @@ pip install unifi-mcp-server
 - 🔧 **API Compatibility Fixes** - 7 critical UniFi Network 9.x fixes including firewall policy zone resolution, WLAN band parameter handling, and response parsing
 - ☁️ **Cloud EA API Hardening** - Enhanced Site Manager endpoint resilience with graceful fallbacks and improved error handling
 - 🔐 **Security Updates** - Dependency bumps: fastmcp → latest, MCP framework → 1.26.0+, cryptography → 46.0.5+, httpx → 0.28.1+
-- 🧪 **1,232 Tests Passing** - Maintained high coverage across Python 3.10–3.13
+- 🧪 **1,236 Tests Passing** - Maintained high coverage across Python 3.10–3.13
 
 **See:** [RELEASE_NOTES_0.2.5.md](RELEASE_NOTES_0.2.5.md) for complete changelog.
 
@@ -257,7 +257,7 @@ Once running in SSE mode, configure your MCP gateway to connect:
 
 - **Async Support**: Built with async/await for high performance and concurrency
 - **MCP Protocol**: Standard Model Context Protocol for AI agent integration
-- **Comprehensive Testing**: 1,232 tests with high coverage, all passing across Python 3.10–3.13
+- **Comprehensive Testing**: 1,236 tests with high coverage, all passing across Python 3.10–3.13
 - **CI/CD Pipelines**: Automated testing, security scanning, and Docker builds (18 checks)
 - **Multi-Architecture**: Docker images for amd64, arm64, arm/v7 (32-bit ARM), and arm64/v8
 - **Security Hardened**: Updated critical dependencies (FastMCP, MCP SDK, cryptography)
@@ -362,7 +362,7 @@ docker-compose down
 
 **Included Services:**
 
-- **UniFi MCP Server**: Main MCP server with 77 tools (69 functional, 8 deprecated)
+- **UniFi MCP Server**: Main MCP server with 86+ tools
 - **MCP Toolbox**: Web-based analytics dashboard (port 8080)
 - **Redis**: High-performance caching layer
 
@@ -880,6 +880,56 @@ After installing from PyPI (`pip install unifi-mcp-server`):
 }
 ```
 
+### Using as a Claude Code Skill
+
+The repo ships a `SKILL.md` and four categorized skill files in `skills/` that let AI agents load UniFi context on-demand — without keeping all 86+ tool definitions in the LLM context for every conversation.
+
+#### Install the skill
+
+```bash
+# Personal skill (available in all Claude Code sessions)
+cp SKILL.md ~/.claude/skills/unifi.md
+
+# Or install all four domain skills individually
+cp skills/unifi-network.md   ~/.claude/skills/
+cp skills/unifi-devices.md   ~/.claude/skills/
+cp skills/unifi-security.md  ~/.claude/skills/
+cp skills/unifi-system.md    ~/.claude/skills/
+```
+
+Once installed, Claude Code will automatically reference the skill when you ask about UniFi topics, without loading the full MCP server into every conversation.
+
+#### Scoped MCP profiles (reduce context footprint)
+
+You can run the MCP server with only the tools you need by setting `UNIFI_PROFILE`:
+
+| Profile | Tools loaded | Best for |
+|---|---|---|
+| `network` | Clients, VLANs, WiFi, DHCP, DNS, vouchers | Day-to-day network ops |
+| `devices` | Inventory, control, ports, switching, topology | Hardware management |
+| `security` | Firewall, ZBF, ACLs, VPN, content filtering | Security audits |
+| `system` | Sites, backups, traffic flows, DPI, RADIUS | Monitoring & ops |
+| `minimal` | Sites + clients + devices only | Quick checks |
+
+```json
+{
+  "mcpServers": {
+    "unifi-security": {
+      "command": "uvx",
+      "args": ["unifi-mcp-server"],
+      "env": {
+        "UNIFI_API_KEY": "your-api-key-here",
+        "UNIFI_API_TYPE": "local",
+        "UNIFI_LOCAL_HOST": "192.168.2.1",
+        "UNIFI_PROFILE": "security"
+      }
+    }
+  }
+}
+```
+
+See [docs/SKILLS.md](docs/SKILLS.md) for the full guide.
+
 **Environment Variables (All Clients):**
 
 - `UNIFI_API_KEY` (required): Your UniFi API key from unifi.ui.com
@@ -892,6 +942,8 @@ After installing from PyPI (`pip install unifi-mcp-server`):
   - `UNIFI_CLOUD_API_URL`: Cloud API URL (default: <https://api.ui.com>)
   - `UNIFI_DEFAULT_SITE`: Default site ID (default: default)
   - `UNIFI_SITE_MANAGER_ENABLED`: Enable Site Manager multi-site tools for cloud-ea (default: false)
+- **Tool Scope (reduces LLM context size)**:
+  - `UNIFI_PROFILE`: Load only a subset of tools — `network`, `devices`, `security`, `system`, or `minimal` (default: all tools)
 - **MCP Server Transport**:
   - `MCP_SERVER_TRANSPORT`: Transport mode (`stdio`, `sse`, `http`, `streamable_http`; default: `stdio`)
   - `MCP_SERVER_HOST`: Bind address (default: `0.0.0.0`)
@@ -1078,8 +1130,15 @@ unifi-mcp-server/
 │   └── workflows/          # CI/CD pipelines (CI, security, release)
 ├── .claude/
 │   └── commands/          # Custom slash commands for development
+├── bin/
+│   └── unifi-cli          # Shell wrapper for CLI invocation
+├── skills/                # Categorized skill files for AI agents
+│   ├── unifi-network.md   # Clients, VLANs, WiFi, DHCP, DNS, vouchers
+│   ├── unifi-devices.md   # Device management, ports, switching, topology
+│   ├── unifi-security.md  # Firewall, ZBF, ACLs, VPN, content filtering
+│   └── unifi-system.md    # Sites, backups, traffic flows, DPI, RADIUS
 ├── src/
-│   ├── main.py            # MCP server entry point (77 tools registered)
+│   ├── main.py            # MCP server entry point (86+ tools registered)
 │   ├── cache.py           # Redis caching implementation
 │   ├── config/            # Configuration management
 │   ├── api/               # UniFi API client with rate limiting
@@ -1111,6 +1170,7 @@ unifi-mcp-server/
 ├── .env.example           # Environment variable template
 ├── pyproject.toml         # Project configuration
 ├── README.md              # This file
+├── SKILL.md               # Top-level AI agent skill manifest
 ├── API.md                 # Complete API documentation
 ├── DEVELOPMENT_PLAN.md    # Development roadmap
 ├── docs/archive/          # Archived planning & session docs
@@ -1337,7 +1397,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - **Docker Registry**: <https://ghcr.io/enuno/unifi-mcp-server>
 - **npm Package**: <https://www.npmjs.com/package/unifi-mcp-server>
 - **MCP Registry**: Search for `io.github.enuno/unifi-mcp-server` at <https://registry.modelcontextprotocol.io>
-- **Documentation**: [API.md](API.md) | [VERIFICATION_REPORT.md](docs/archive/VERIFICATION_REPORT.md)
+- **Documentation**: [API.md](API.md) | [SKILLS.md](docs/SKILLS.md) | [VERIFICATION_REPORT.md](docs/archive/VERIFICATION_REPORT.md)
 - **UniFi Official**: <https://www.ui.com/>
 
 ## 🌟 Star History

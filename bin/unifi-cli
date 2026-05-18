@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+# Thin wrapper — delegates to the unifi-mcp-server CLI module.
+# Usage: unifi-cli <tool-name> [--param value ...]
+# Example: unifi-cli list-clients --site default
+#
+# Required env vars:
+#   UNIFI_API_KEY      API key (from controller Settings > API Keys)
+#   UNIFI_API_TYPE     local | cloud-v1 | cloud-ea  (default: cloud-v1)
+#   UNIFI_LOCAL_HOST   Gateway IP (local mode only)
+#
+# Optional env vars:
+#   UNIFI_SITE         Default site ID (default: default)
+#   UNIFI_VERIFY_SSL   Verify TLS certificates (default: true)
+#   UNIFI_TIMEOUT      Request timeout in seconds (default: 30)
+#   UNIFI_PROFILE      Load only a tool subset: network | devices | security | system | minimal
+
+set -e
+
+if [ -z "$UNIFI_API_KEY" ]; then
+  echo "Error: UNIFI_API_KEY is not set." >&2
+  echo "  export UNIFI_API_KEY=your-api-key" >&2
+  exit 1
+fi
+
+# Prefer uvx when available (no install required); fall back to the installed CLI.
+if command -v uvx >/dev/null 2>&1; then
+  exec uvx unifi-mcp-server cli "$@"
+elif command -v unifi-mcp-server >/dev/null 2>&1; then
+  exec unifi-mcp-server cli "$@"
+else
+  echo "Error: unifi-mcp-server is not installed." >&2
+  echo "  pip install unifi-mcp-server" >&2
+  echo "  # or: uvx unifi-mcp-server" >&2
+  exit 1
+fi
