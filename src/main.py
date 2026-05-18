@@ -192,6 +192,7 @@ _PROFILE_MODULES: dict[str, list[Any]] = {
     "system": [
         application_tools,
         backups_tools,
+        connector_tools,
         dpi_tools,
         dpi_new_tools,
         qos_tools,
