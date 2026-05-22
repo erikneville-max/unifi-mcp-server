@@ -7,6 +7,7 @@ from ..config import Settings
 from ..utils import (
     ResourceNotFoundError,
     ValidationError,
+    coerce_bool,
     get_logger,
     log_audit,
     sanitize_log_message,
@@ -62,6 +63,7 @@ async def create_network(
     """
     site_id = validate_site_id(site_id)
     validate_confirmation(confirm, "network configuration operation", dry_run)
+    dry_run = coerce_bool(dry_run)
     logger = get_logger(__name__, settings.log_level)
 
     # Validate VLAN ID
@@ -212,6 +214,7 @@ async def update_network(
     """
     site_id = validate_site_id(site_id)
     validate_confirmation(confirm, "network configuration operation", dry_run)
+    dry_run = coerce_bool(dry_run)
     logger = get_logger(__name__, settings.log_level)
 
     # Validate VLAN ID if provided
@@ -229,6 +232,13 @@ async def update_network(
         "vlan_id": vlan_id,
         "subnet": subnet,
         "dhcp_enabled": dhcp_enabled,
+        "dhcp_start": dhcp_start,
+        "dhcp_stop": dhcp_stop,
+        "dhcp_dns_1": dhcp_dns_1,
+        "dhcp_dns_2": dhcp_dns_2,
+        "dhcp_dns_3": dhcp_dns_3,
+        "dhcp_dns_4": dhcp_dns_4,
+        "domain_name": domain_name,
     }
 
     if dry_run:
@@ -347,6 +357,7 @@ async def delete_network(
     """
     site_id = validate_site_id(site_id)
     validate_confirmation(confirm, "network configuration operation", dry_run)
+    dry_run = coerce_bool(dry_run)
     logger = get_logger(__name__, settings.log_level)
 
     parameters = {"site_id": site_id, "network_id": network_id}
