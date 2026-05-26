@@ -37,6 +37,7 @@ from .tools import firewall_groups as firewall_groups_tools
 from .tools import firewall_policies as firewall_policies_tools
 from .tools import firewall_zones as firewall_zones_tools
 from .tools import network_config as network_config_tools
+from .tools import integration_api as integration_api_tools
 from .tools import networks as networks_tools
 from .tools import port_forwarding as port_fwd_tools
 from .tools import port_profiles as port_profile_tools
@@ -112,6 +113,7 @@ _CLOUD_TOOL_MODULES = [
     sites_tools,
     site_manager_tools,
     connector_tools,
+    integration_api_tools,
 ]
 
 _LOCAL_TOOL_MODULES = [
@@ -195,6 +197,7 @@ _PROFILE_MODULES: dict[str, list[Any]] = {
         connector_tools,
         dpi_tools,
         dpi_new_tools,
+        integration_api_tools,
         qos_tools,
         radius_tools,
         ref_tools,
