@@ -26,6 +26,23 @@ from .firewall_policy import (
     Schedule,
 )
 from .firewall_zone import FirewallZone
+from .integration_api import (
+    DPICategory,
+    IntegrationClient,
+    IntegrationDevice,
+    IntegrationDeviceTag,
+    IntegrationDNSPolicy,
+    IntegrationNetwork,
+    IntegrationSite,
+    IntegrationVPNServer,
+    IntegrationWAN,
+    IntegrationWifiBroadcast,
+    NetworkMetadata,
+    PaginatedResponse,
+    WifiBroadcastingDeviceFilter,
+    WifiNetworkRef,
+    WifiSecurityConfiguration,
+)
 from .network import Network
 from .port_profile import PortOverride, PortProfile, PortTableEntry
 from .qos_profile import MatchCriteria, RouteAction, RouteSchedule, TrafficRoute
@@ -106,4 +123,19 @@ __all__ = [
     "PortProfile",
     "PortOverride",
     "PortTableEntry",
+    "IntegrationSite",
+    "IntegrationDevice",
+    "IntegrationClient",
+    "IntegrationNetwork",
+    "IntegrationWifiBroadcast",
+    "IntegrationDNSPolicy",
+    "IntegrationWAN",
+    "IntegrationVPNServer",
+    "IntegrationDeviceTag",
+    "DPICategory",
+    "PaginatedResponse",
+    "NetworkMetadata",
+    "WifiNetworkRef",
+    "WifiSecurityConfiguration",
+    "WifiBroadcastingDeviceFilter",
 ]
