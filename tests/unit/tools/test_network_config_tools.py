@@ -993,3 +993,139 @@ async def test_update_network_dns_settings(mock_settings):
 
     assert result["dhcpd_dns_1"] == "1.1.1.1"
     assert result["dhcpd_dns_2"] == "1.0.0.1"
+
+
+# =============================================================================
+# String coercion tests for dry_run (fix for MCP clients serializing as string)
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_create_network_dry_run_string_false(mock_settings):
+    """Test that dry_run='false' (string) executes the real API call."""
+    mock_response = {
+        "data": [{"_id": "network123", "name": "Test Network", "purpose": "corporate"}]
+    }
+    mock_client = MagicMock()
+    mock_client.authenticate = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch.object(nc_module, "UniFiClient", return_value=mock_client):
+        result = await create_network(
+            site_id="default",
+            name="Test Network",
+            vlan_id=10,
+            subnet="192.168.10.0/24",
+            settings=mock_settings,
+            confirm=True,
+            dry_run="false",
+        )
+
+    mock_client.post.assert_called_once()
+    assert result.get("dry_run") is not True
+
+
+@pytest.mark.asyncio
+async def test_create_network_dry_run_string_true(mock_settings):
+    """Test that dry_run='true' (string) still triggers dry_run behavior."""
+    result = await create_network(
+        site_id="default",
+        name="Test Network",
+        vlan_id=10,
+        subnet="192.168.10.0/24",
+        settings=mock_settings,
+        confirm=True,
+        dry_run="true",
+    )
+
+    assert result["dry_run"] is True
+    assert "would_create" in result
+
+
+@pytest.mark.asyncio
+async def test_update_network_dry_run_string_false(mock_settings):
+    """Test that dry_run='false' (string) executes the real API call."""
+    mock_networks_response = {
+        "data": [{"_id": "network123", "name": "Old Name", "purpose": "corporate"}]
+    }
+    mock_update_response = {
+        "data": [{"_id": "network123", "name": "New Name", "purpose": "corporate"}]
+    }
+    mock_client = MagicMock()
+    mock_client.authenticate = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_networks_response)
+    mock_client.put = AsyncMock(return_value=mock_update_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch.object(nc_module, "UniFiClient", return_value=mock_client):
+        result = await update_network(
+            site_id="default",
+            network_id="network123",
+            settings=mock_settings,
+            name="New Name",
+            confirm=True,
+            dry_run="false",
+        )
+
+    mock_client.put.assert_called_once()
+    assert result.get("dry_run") is not True
+
+
+@pytest.mark.asyncio
+async def test_update_network_dry_run_string_true(mock_settings):
+    """Test that dry_run='true' (string) still triggers dry_run behavior."""
+    result = await update_network(
+        site_id="default",
+        network_id="network123",
+        settings=mock_settings,
+        name="New Name",
+        confirm=True,
+        dry_run="true",
+    )
+
+    assert result["dry_run"] is True
+    assert "would_update" in result
+
+
+@pytest.mark.asyncio
+async def test_delete_network_dry_run_string_false(mock_settings):
+    """Test that dry_run='false' (string) executes the real API call."""
+    mock_networks_response = {
+        "data": [{"_id": "network123", "name": "Test Network", "purpose": "corporate"}]
+    }
+    mock_client = MagicMock()
+    mock_client.authenticate = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_networks_response)
+    mock_client.delete = AsyncMock(return_value={"data": []})
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with patch.object(nc_module, "UniFiClient", return_value=mock_client):
+        result = await delete_network(
+            site_id="default",
+            network_id="network123",
+            settings=mock_settings,
+            confirm=True,
+            dry_run="false",
+        )
+
+    mock_client.delete.assert_called_once()
+    assert result.get("dry_run") is not True
+
+
+@pytest.mark.asyncio
+async def test_delete_network_dry_run_string_true(mock_settings):
+    """Test that dry_run='true' (string) still triggers dry_run behavior."""
+    result = await delete_network(
+        site_id="default",
+        network_id="network123",
+        settings=mock_settings,
+        confirm=True,
+        dry_run="true",
+    )
+
+    assert result["dry_run"] is True
+    assert result["would_delete"] == "network123"
