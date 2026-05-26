@@ -19,5 +19,8 @@
   "homepage": "https://github.com/enuno/unifi-mcp-server",
   "bugs": {
     "url": "https://github.com/enuno/unifi-mcp-server/issues"
+  },
+  "dependencies": {
+    "posthog-node": "^5.26.0"
   }
 }

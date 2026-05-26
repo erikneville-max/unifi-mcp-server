@@ -1,8 +1,8 @@
 # UniFi MCP Server Development Plan
 
-**Document Version:** 2026-04-23
+**Document Version:** 2026-05-12
 **API Target:** UniFi Network v10.3.55 + Site Manager v1.0.0 + Protect v6.2.83
-**Current Codebase:** ~200 async tool functions across 37 modules
+**Current Codebase:** ~200 async tool functions across 38 modules
 
 ---
 
@@ -10,7 +10,7 @@
 
 This plan maps the path from the current implementation (~200 tools) to full API code coverage against the documented UniFi API surface. The current server covers the majority of Network API endpoints, a subset of Site Manager endpoints, and zero Protect endpoints.
 
-**Immediate priority** is closing the remaining Network API gaps, completing Site Manager coverage, and implementing the documented Protect API. The plan is organized into four execution phases with clear deliverables and acceptance criteria.
+**Immediate priority** is resolving documentation accuracy debt in API.md (several documented tools either raise `NotImplementedError` or have wrong parameter signatures), completing the remaining minor Network API gaps, adding Cloud Connector support, and implementing the documented Protect API. The plan is organized into four execution phases with clear deliverables and acceptance criteria.
 
 ---
 
@@ -24,123 +24,146 @@ This plan maps the path from the current implementation (~200 tools) to full API
 | **Clients** | Complete | ~8 | List, details, search, block/unblock, reconnect, DPI |
 | **Networks** | Complete | ~8 | VLANs, WAN, corporate, VPN networks; full CRUD |
 | **WiFi / WLANs** | Complete | ~6 | SSID CRUD, statistics, radio config |
-| **Firewall Zones** | Complete | ~10 | Zone CRUD, assignment, policies, matrix (read-only where API limits) |
-| **Firewall Policies** | Complete | ~8 | Policy CRUD, ordering, patch |
+| **Firewall Zones** | Complete | ~7 | Zone CRUD, assignment, `get_zone_networks` |
+| **Firewall Policies** | Complete | ~6 | Policy CRUD via v2 API; zone resolved by name/UUID/ObjectId |
 | **ACL Rules** | Complete | ~6 | ACL CRUD, ordering |
 | **Firewall Groups** | Complete | ~6 | Address/port group CRUD |
-| **Traffic Flows** | Complete | ~15 | Real-time flows, filtering, analytics, blocking, export |
-| **DPI** | Complete | ~5 | Statistics, top applications, client DPI, categories, applications |
-| **QoS** | Complete | ~12 | QoS profiles, ProAV templates, Smart Queue, traffic routes, DSCP |
+| **Traffic Flows** | Complete | ~13 | Real-time flows (50-flow cap), filtering, analytics, blocking, export |
+| **DPI** | Complete | ~5 | Statistics, top applications, client DPI |
+| **QoS / Traffic Routes** | Complete | ~4 | Traffic route CRUD (`rest/routing`); QoS profile tools removed (endpoints don't exist on hardware) |
 | **Traffic Matching Lists** | Complete | ~5 | CRUD operations |
 | **Port Forwarding** | Complete | ~5 | CRUD |
-| **Port Profiles** | Complete | ~6 | CRUD with overrides |
+| **Port Profiles** | Complete | ~8 | Profile CRUD + device port overrides |
+| **Switching** | Complete | ~6 | Switch stacks, MC-LAG domains, LAGs — `src/tools/switching.py` |
 | **RADIUS** | Complete | ~10 | Profile CRUD, account CRUD |
 | **Guest Portal / Hotspot** | Complete | ~8 | Portal config, packages, vouchers |
-| **Backups** | Complete | ~11 | Trigger, list, download, delete, restore, validate, schedule |
-| **Topology** | Complete | ~5 | Graph data, connections, port mappings, export, statistics |
+| **Backups** | Complete | ~8 | Trigger, list, download, delete, restore, schedule, status |
+| **Topology** | Complete | ~5 | Graph data, connections, port mappings, export (json/graphml/dot), statistics |
 | **Site VPN** | Complete | ~4 | Site-to-site tunnels, server list |
 | **WAN / DNS** | Complete | ~6 | Connections, DNS, content filtering |
 | **DHCP Reservations** | Complete | ~5 | CRUD |
-| **Site Manager (partial)** | Partial | ~15 | Aggregated sites, health, inventory, ISP metrics, SD-WAN, hosts, version control |
+| **Site Manager (partial)** | Partial | ~15 | Aggregated sites, health, inventory, ISP metrics, SD-WAN read, hosts, version control |
 | **Device Control** | Complete | ~6 | Upgrade, restart, locate, LED |
 
-**Total implemented:** ~194 async tool functions.
+**Total implemented:** ~200 async tool functions.
 
-### 2.2 Known Limitations
+### 2.2 Known Limitations & Bugs
 
-- **ZBF Matrix policies:** Read-only / limited due to API endpoint unavailability on real hardware. Verified on UDM Pro v10.0.156+. See `docs/archive/ZBF_STATUS.md`.
+- **Traffic flow tools `get_flow_trends`, `stream_traffic_flows`, `get_connection_states`** raise `NotImplementedError` — the v2 endpoint has a hard 50-flow rolling cap with no historical or streaming capability. API.md incorrectly documents these as working. See §3.2.
+- **ZBF Matrix policies:** Read-only / limited due to API endpoint unavailability on real hardware (UDM Pro v10.0.156+). See `docs/archive/ZBF_STATUS.md`.
 - **Cloud Connector proxy:** Not yet implemented (requires separate auth flow research).
 - **Protect API:** Zero coverage (documented but not coded).
+- **API.md documentation debt:** Multiple tools documented with wrong parameters or marked as working when they raise `NotImplementedError`. See §3.2.
+- **`health_check` version hardcode:** Returns `"version": "0.2.4"` but `pyproject.toml` is at `0.2.5`.
 
 ---
 
 ## 3. Gap Analysis
 
-Based on `docs/UNIFI_API.md` (v10.3.55) and `API.md`.
+Based on `docs/UNIFI_API.md` (v10.3.55), `API.md`, and direct source code review (2026-05-12).
 
 ### 3.1 Critical Gaps (Blocking Full Coverage)
 
 | # | Gap | API Version | Endpoints | Impact |
 |---|-----|-------------|-----------|--------|
 | G1 | **Protect API** | v6.2.83 | 36+ endpoints (cameras, lights, sensors, chimes, NVR, RTSPS, PTZ, talkback, live views, events) | Largest single gap. Fully documented, zero code. |
-| G2 | **Switching API** | v10.3.55 | Switch Stacks, MC-LAG Domains, LAGs | Documented in UNIFI_API.md, no tools. |
+| G2 | **Cloud Connector** | v1.0.0 | Network + Protect proxy endpoints (POST/GET/PUT/DELETE/PATCH) | Enables remote cloud management without direct local access. |
 | G3 | **Network References** | v10.3.55 | `/api/s/{site}/rest/networkref` | Small gap, used for network dependency mapping. |
-| G4 | **Cloud Connector** | v1.0.0 | Network + Protect proxy endpoints (POST/GET/PUT/DELETE/PATCH) | Enables remote cloud management without direct local access. |
 
-### 3.2 Minor Gaps
+### 3.2 Documentation Accuracy Debt
+
+These are **code-correct but API.md is wrong** — documentation must be fixed to match implementation.
+
+| # | Tool / Section | API.md Claim | Actual Behavior | Fix Required |
+|---|----------------|--------------|-----------------|--------------|
+| D1 | `get_flow_trends` | "Get historical flow trends" with `time_range` / `interval` params | Raises `NotImplementedError` — v2 endpoint has no historical capability | Update API.md to document limitation; remove fake parameters |
+| D2 | `stream_traffic_flows` | "Stream real-time traffic flow updates" | Raises `NotImplementedError` — 50-flow cap makes streaming impractical | Update API.md to document limitation |
+| D3 | `get_connection_states` | "Get connection states" with `time_range` | Raises `NotImplementedError` — v2 returns completed flows, not live states | Update API.md to document limitation |
+| D4 | `download_backup` | `output_path`, `verify_checksum` params | Returns raw `bytes`; no output path or checksum logic | Either implement file-save + checksum, or update API.md to match |
+| D5 | `restore_backup` | `create_pre_restore_backup` param | Not in implementation; param silently ignored | Either implement pre-restore backup, or remove from API.md |
+| D6 | Configuration table | `UNIFI_HOST`, `UNIFI_VERIFY_SSL`, `UNIFI_SITE`, `UNIFI_RATE_LIMIT` | Actual names: `UNIFI_LOCAL_HOST`, `UNIFI_LOCAL_VERIFY_SSL`, `UNIFI_DEFAULT_SITE`, `UNIFI_RATE_LIMIT_REQUESTS` | Fix env var names in API.md |
+| D7 | `health_check` | `"version": "0.1.0"` in example | Hardcoded `"0.2.4"` in `src/main.py:189`; `pyproject.toml` is `0.2.5` | Read version dynamically from package metadata |
+
+### 3.3 Minor Gaps
 
 | # | Gap | Notes |
 |---|-----|-------|
-| G5 | **Speed Test** | Endpoints exist (`/cmd/devmgr/speedtest`, `/cmd/devmgr/speedtest-status`) but not implemented. Low user demand. |
-| G6 | **Spectrum Scan** | `/stat/spectrumscan` for RF analysis. Low priority. |
-| G7 | **Dynamic DNS full CRUD** | GET exists; PUT/POST/DELETE for custom providers missing. |
-| G8 | **Tagged MAC Management** | `/rest/tag` endpoints. Low priority. |
-| G9 | **Device Migration** | `/cmd/devmgr/migrate`, `/cmd/devmgr/cancel-migrate`. Low priority. |
+| ~~G4~~ | ~~Speed Test~~ | ✅ Complete — `run_speed_test`, `get_speed_test_status`, `get_speed_test_history` in `src/tools/diagnostics.py` |
+| ~~G5~~ | ~~Spectrum Scan~~ | ✅ Complete — `get_spectrum_scan`, `list_spectrum_interference` in `src/tools/diagnostics.py` |
+| G6 | **Dynamic DNS full CRUD** | GET exists; PUT/POST/DELETE for custom providers missing. |
+| G7 | **Tagged MAC Management** | `/rest/tag` endpoints. Low priority. |
+| G8 | **Device Migration** | `/cmd/devmgr/migrate`, `/cmd/devmgr/cancel-migrate`. Low priority. |
 
 ---
 
 ## 4. Phased Implementation Plan
 
-### Phase 1: Network API Completion (Target: 2-3 weeks)
+### Phase 0: Documentation Accuracy & Housekeeping (Target: 3-5 days)
 
-**Goal:** Close all remaining Network API v10.3.55 gaps.
+**Goal:** Eliminate API.md/code mismatches before adding new features. Stale docs cause more confusion than missing features.
 
-#### 1.1 Switching API
+#### 0.1 Fix API.md env var names (D6)
+- Replace all instances of `UNIFI_HOST` → `UNIFI_LOCAL_HOST`, `UNIFI_VERIFY_SSL` → `UNIFI_LOCAL_VERIFY_SSL`, `UNIFI_SITE` → `UNIFI_DEFAULT_SITE`, `UNIFI_RATE_LIMIT` → `UNIFI_RATE_LIMIT_REQUESTS`
 
-- `list_switch_stacks` / `get_switch_stack`
-- `list_mclag_domains` / `get_mclag_domain`
-- `list_lags` / `get_lag_details`
-- Data models: `SwitchStack`, `MclagDomain`, `Lag`, `LagMember`
-- Estimated tools: 6
-- Acceptance: integration tests against real or mock stack topology
+#### 0.2 Update unsupported tool documentation (D1, D2, D3)
+- Mark `get_flow_trends`, `stream_traffic_flows`, `get_connection_states` with a clear ⚠️ NOT SUPPORTED section in API.md explaining the v2 endpoint constraint (50-flow rolling window, no history)
 
-#### 1.2 Network References
+#### 0.3 Fix `download_backup` / `restore_backup` discrepancies (D4, D5)
+- **Option A (preferred):** Implement `output_path` saving + SHA-256 checksum in `backups.py` and implement pre-restore backup creation in `restore_backup`
+- **Option B:** Strip the unimplemented params from API.md
 
-- `get_network_references(site_id, network_id)`
-- Returns upstream/downstream network dependencies
-- Estimated tools: 1
-- Acceptance: returns valid reference graph for a corporate network
+#### 0.4 Fix `health_check` version (D7)
+- Read version from `importlib.metadata.version("unifi-mcp-server")` instead of hardcoding
 
-#### 1.3 Speed Test & Spectrum (Stretch)
-
-- `run_speed_test`, `get_speed_test_status`, `get_speed_test_history`
-- `get_spectrum_scan`, `list_spectrum_interference`
-- Estimated tools: 4-5
-- Acceptance: dry-run safe; speed test triggers real traffic (document clearly)
-
-**Phase 1 Deliverables:**
-
-- [ ] `src/tools/switching.py` with full Switching API coverage
-- [ ] `src/models/switching.py` data models
-- [ ] Network references tool in `src/tools/networks.py` or new module
-- [ ] Integration tests for switching and references
-- [ ] `API.md` and `UNIFI_API.md` updated with ✅ marks
+**Phase 0 Deliverables:** ✅ Complete (PR #78, 2026-05-12)
+- [x] API.md env var table corrected
+- [x] Unsupported flow tool sections updated with accurate limitations
+- [x] `download_backup` and `restore_backup` — verified already correctly implemented; API.md was accurate
+- [x] `health_check` returns dynamic version from package metadata
+- [x] All pre-commit hooks pass
 
 ---
 
-### Phase 2: Site Manager API Completion (Target: 1-2 weeks)
+### Phase 1: Network API Completion ✅ Complete (2026-05-13)
+
+**Goal:** Close all remaining Network API v10.3.55 gaps.
+
+All Phase 1 tools were already present in `src/tools/diagnostics.py` and registered in `main.py`. Verified by code review on 2026-05-13.
+
+#### 1.1 Network References ✅
+- ~~`list_switch_stacks`, `get_switch_stack`~~ ✅ Complete
+- ~~`list_mclag_domains`, `get_mclag_domain`~~ ✅ Complete
+- ~~`list_lags`, `get_lag_details`~~ ✅ Complete
+- `get_network_references` ✅ Complete — `src/tools/diagnostics.py`, 3 tests
+
+#### 1.2 Speed Test & Spectrum ✅
+- `run_speed_test`, `get_speed_test_status`, `get_speed_test_history` ✅ — 7 tests
+- `get_spectrum_scan`, `list_spectrum_interference` ✅ — 8 tests
+
+**Phase 1 Deliverables:**
+- [x] All 6 tools implemented in `src/tools/diagnostics.py`
+- [x] Models in `src/models/diagnostics.py` (`NetworkReference`, `SpeedTestResult`, `SpectrumScan`, `SpectrumInterference`)
+- [x] 22 unit tests in `tests/unit/test_diagnostics.py`
+- [x] Tools registered in `src/main.py` local tool modules
+
+---
+
+### Phase 2: Site Manager API Completion ✅ Complete (2026-05-13)
 
 **Goal:** Complete Site Manager v1.0.0 coverage and add Cloud Connector foundation.
 
-#### 2.1 Connector Proxy — Network
+#### 2.1 Connector Proxy — Network ✅
+- `connector_network_get`, `connector_network_post`, `connector_network_put`, `connector_network_patch`, `connector_network_delete` — in `src/tools/connector.py`
 
-- `connector_network_post`, `connector_network_get`, `connector_network_put`, `connector_network_delete`, `connector_network_patch`
-- Generic wrapper tools that proxy arbitrary requests through `api.ui.com/v1/connector/...`
-- Requires `console_id`, `site_id`, and path/body parameters
-- Estimated tools: 5
-
-#### 2.2 Connector Proxy — Protect
-
-- `connector_protect_post`, `connector_protect_get`, `connector_protect_put`, `connector_protect_delete`, `connector_protect_patch`
-- Same pattern as Network connector
-- Estimated tools: 5
+#### 2.2 Connector Proxy — Protect ✅
+- `connector_protect_get`, `connector_protect_post`, `connector_protect_put`, `connector_protect_patch`, `connector_protect_delete` — in `src/tools/connector.py`
 
 **Phase 2 Deliverables:**
-
-- [ ] `src/tools/connector.py` with Network and Protect proxy tools
-- [ ] `src/models/connector.py` request/response wrappers
-- [ ] Documentation: connector auth flow and usage examples
-- [ ] Integration tests (mocked cloud responses)
+- [x] `src/tools/connector.py` — 10 proxy tools (network + protect)
+- [x] `src/api/site_manager_client.py` extended with `post()`, `put()`, `patch()`, `delete()`
+- [x] No separate models needed — tools are pure pass-throughs returning raw API responses
+- [x] 25 unit tests in `tests/unit/tools/test_connector_tools.py`
+- [x] Registered in `_CLOUD_TOOL_MODULES` in `src/main.py` (available in all API modes)
 
 ---
 
@@ -232,8 +255,8 @@ This is a new application domain requiring:
 #### 4.2 Test Coverage
 
 - Unit tests for all new Phase 1-3 modules
-- Integration tests for Switching, Connector, Protect
-- Target: 80%+ overall coverage (currently ~84% on core modules)
+- Integration tests for Connector, Protect
+- Target: 80%+ overall coverage
 
 #### 4.3 Documentation
 
@@ -244,7 +267,7 @@ This is a new application domain requiring:
 
 #### 4.4 Release Preparation
 
-- Version bump to v0.2.0 (or appropriate version)
+- Version bump to v0.3.0 (or appropriate version)
 - Pre-commit hooks pass (`ruff`, `mypy`, `bandit`)
 - Docker build verification
 - Security scan clean
@@ -262,9 +285,9 @@ This is a new application domain requiring:
 
 | Version | Scope | New Tools | Cumulative | Timeline |
 |---------|-------|-----------|------------|----------|
-| **v0.1.x** | Current | ~194 | ~194 | Now |
-| **v0.2.0** | Phase 1 + Phase 2 + Phase 4 minor gaps | ~25-30 | ~220-225 | Q2 2026 |
-| **v0.3.0** | Phase 3 — Protect API | ~35-40 | ~255-265 | Q3 2026 |
+| **v0.2.5** | Current (includes Switching API ✅) | ~200 | ~200 | Now |
+| **v0.3.0** | Phase 0 (docs) + Phase 1 (net refs) + Phase 2 (connector) + Phase 4 minor | ~10-15 | ~210-215 | Q2 2026 |
+| **v0.4.0** | Phase 3 — Protect API | ~35-40 | ~245-255 | Q3 2026 |
 | **v1.0.0** | Multi-application platform, enterprise features | TBD | 300+ | H2 2026 |
 
 ---
@@ -290,30 +313,31 @@ All endpoints below have corresponding MCP tools and models.
 - `/api/s/{site}/rest/portforward` — Port forwarding
 - `/api/s/{site}/rest/portconf` — Port profiles
 - `/api/s/{site}/rest/dhcpgroup` / `dhcpd` — DHCP reservations
-- `/api/s/{site}/rest/trafficroute` / `qosprofile` — QoS
+- `/api/s/{site}/rest/routing` — Traffic routes (QoS routing)
 - `/api/s/{site}/rest/trafficmatch` — Traffic matching lists
-- `/api/s/{site}/stat/trafficflow` / `rest/trafficflow` — Traffic flows
+- `/proxy/network/v2/api/site/{site}/traffic-flows` — Traffic flows (v2, local only)
 - `/api/s/{site}/stat/dpi` — DPI statistics
 - `/api/s/{site}/stat/topology` — Topology
 - `/api/cmd/backup` / `/api/backup/...` — Backups
 - `/api/s/{site}/rest/wanconf` / `rest/dnsfilter` — WAN/DNS
 - `/api/s/{site}/rest/vpntunnel` — Site-to-site VPN
-- Site Manager v1: aggregated sites, health, inventory, ISP metrics, SD-WAN, hosts
+- `/integration/v1/sites/{site}/switching/switch-stacks` — Switch stacks ✅
+- `/integration/v1/sites/{site}/switching/mc-lag-domains` — MC-LAG domains ✅
+- `/integration/v1/sites/{site}/switching/lags` — LAGs ✅
+- Site Manager v1: aggregated sites, health, inventory, ISP metrics, SD-WAN read, hosts
 
 ### Partially Implemented ⚠️
 
 | Endpoint | Status | Missing |
 |----------|--------|---------|
 | `/api/s/{site}/rest/dynamicdns` | GET only | PUT/POST/DELETE |
-| `/api/s/{site}/rest/firewallzonematrix` | Read-only | Advanced matrix mutations (API-limited on hardware) |
+| `/proxy/network/v2/api/site/{site}/traffic-flows` | Works but `get_flow_trends`, `stream_traffic_flows`, `get_connection_states` raise `NotImplementedError` | Historical/streaming not feasible with 50-flow cap; API.md needs update (D1-D3) |
+| Backup tools | Implemented but `download_backup` lacks `output_path`/checksum; `restore_backup` lacks pre-restore backup | See D4, D5 |
 
 ### Not Implemented ❌
 
 | Endpoint | Category | Planned Phase |
 |----------|----------|---------------|
-| `/api/s/{site}/rest/switchstack` | Switching | Phase 1 |
-| `/api/s/{site}/rest/mclagdomain` | Switching | Phase 1 |
-| `/api/s/{site}/rest/lag` | Switching | Phase 1 |
 | `/api/s/{site}/rest/networkref` | Networks | Phase 1 |
 | `/api/s/{site}/cmd/devmgr/speedtest` | Diagnostics | Phase 1 (stretch) |
 | `/api/s/{site}/stat/spectrumscan` | RF | Phase 4 |
@@ -334,7 +358,6 @@ src/
   api/
     protect_client.py      # Phase 3
   models/
-    switching.py           # Phase 1
     protect_camera.py      # Phase 3
     protect_light.py       # Phase 3
     protect_sensor.py      # Phase 3
@@ -343,7 +366,6 @@ src/
     protect_liveview.py    # Phase 3
     connector.py           # Phase 2
   tools/
-    switching.py           # Phase 1
     connector.py           # Phase 2
     protect_cameras.py     # Phase 3
     protect_devices.py     # Phase 3
@@ -356,38 +378,27 @@ src/
 
 ### 7.2 Data Model Patterns
 
-All new models follow the existing Pydantic v2 pattern:
-
-```python
-from pydantic import BaseModel, Field
-from typing import Literal
-
-class SwitchStack(BaseModel):
-    id: str = Field(alias="_id")
-    name: str
-    model: str
-    member_ports: list[str]
-    enabled: bool = True
-```
+All new models follow the existing Pydantic v2 pattern with `populate_by_name=True`, `extra="allow"`, and `alias="_id"` for MongoDB ObjectId fields.
 
 ### 7.3 Tool Registration
 
 New tool modules are auto-registered via `register_module_tools()` in `src/main.py`. After creating a new module, add the import and registration call:
 
 ```python
-from .tools import switching as switching_tools
+from .tools import connector as connector_tools
 # ...
-register_module_tools(mcp, switching_tools, settings)
+register_module_tools(mcp, connector_tools, settings)
 ```
 
 ---
 
 ## 8. Testing & Quality Targets
 
-| Metric | Current | Phase 1 Target | Phase 3 Target |
+| Metric | Current | Phase 0 Target | Phase 3 Target |
 |--------|---------|----------------|----------------|
-| Unit test coverage | ~84% (core) | 85% | 80%+ overall |
-| Integration tests | 12 suites | +2 (switching, connector) | +1 (protect) |
+| Unit test coverage | ~84% (core) | 84% (no regression) | 80%+ overall |
+| Integration tests | 12 suites | +0 | +1 (protect) |
+| API.md accuracy | ❌ Several wrong | ✅ Fixed | ✅ Maintained |
 | Lint (ruff) | Pass | Pass | Pass |
 | Type check (mypy) | Pass | Pass | Pass |
 | Security (bandit) | Pass | Pass | Pass |
@@ -410,12 +421,12 @@ After each phase:
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | Protect API endpoints differ from docs | Medium | High | Verify against real NVR early in Phase 3; maintain fallback wrappers |
-| Switching endpoints unavailable on test hardware | Medium | Medium | Use mock responses for CI; manual validation on physical stack |
 | Cloud Connector requires OAuth changes | Low | Medium | Research auth flow before Phase 2; fallback to API-key proxy if possible |
 | Test coverage drops below threshold | Low | Medium | Gate PRs on coverage; add tests before merging features |
+| API.md drift recurs | Medium | Medium | Add API.md accuracy check to pre-commit or CI |
 
 ---
 
-*Plan maintained by: Hermes / AI coding agents*
-*Last updated: 2026-04-23*
-*Next review: Phase 1 completion*
+*Plan maintained by: Development Team / AI coding agents*
+*Last updated: 2026-05-12*
+*Next review: Phase 0 completion*
