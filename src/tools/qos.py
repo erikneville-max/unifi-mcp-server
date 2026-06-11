@@ -65,7 +65,12 @@ async def list_traffic_routes(
         # Apply pagination
         paginated_data = data[offset : offset + limit]
 
-        return [TrafficRoute(**route).model_dump() for route in paginated_data]
+        # Filter out static routes (identified by static-route_nexthop key) since they are not traffic routes
+        traffic_routes = [
+            route for route in paginated_data
+            if "static-route_nexthop" not in route
+        ]
+        return [TrafficRoute(**route).model_dump() for route in traffic_routes]
 
 
 async def create_traffic_route(
