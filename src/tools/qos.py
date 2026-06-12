@@ -11,7 +11,7 @@ caught until tested against real hardware.
 See: https://developer.ui.com/network/ for documented endpoints.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from ..api.client import UniFiClient
 from ..config import Settings
@@ -60,10 +60,29 @@ async def list_traffic_routes(
             await client.authenticate()
 
         response = await client.get(f"/ea/sites/{site_id}/rest/routing")
-        data = response if isinstance(response, list) else response.get("data", [])
+        data = cast(
+            list[dict[str, Any]],
+            response if isinstance(response, list) else response.get("data", []),
+        )
 
-        # Apply pagination
-        paginated_data = data[offset : offset + limit]
+        traffic_routes: list[dict[str, Any]] = [
+            route
+            for route in data
+            if "static-route_nexthop" not in route
+            and "action" in route
+            and "match_criteria" in route
+        ]
+
+        skipped_routes = len(data) - len(traffic_routes)
+        if skipped_routes:
+            logger.info(
+                sanitize_log_message(
+                    f"Skipped {skipped_routes} non-traffic route(s) returned by /rest/routing"
+                )
+            )
+
+        # Apply pagination over traffic routes only
+        paginated_data = traffic_routes[offset : offset + limit]
 
         return [TrafficRoute(**route).model_dump() for route in paginated_data]
 

@@ -4,7 +4,7 @@ from typing import Any
 
 from ..api.client import UniFiClient
 from ..config import Settings
-from ..models import Country, DPIApplication, DPICategory
+from ..models.dpi import Country, DPIApplication, DPICategory
 from ..utils import get_logger
 
 logger = get_logger(__name__)

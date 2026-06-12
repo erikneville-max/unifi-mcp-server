@@ -95,6 +95,67 @@ class TestListTrafficRoutes:
             result = await list_traffic_routes("default", mock_settings, limit=2, offset=2)
             assert len(result) == 2
 
+    @pytest.mark.asyncio
+    async def test_list_traffic_routes_filters_static_routes_before_pagination(self, mock_settings):
+        from src.tools.qos import list_traffic_routes
+
+        mixed_routes = [
+            {
+                "_id": "policy-001",
+                "name": "Policy 1",
+                "action": "deny",
+                "enabled": True,
+                "match_criteria": {"destination_port": 53, "protocol": "udp"},
+                "priority": 100,
+                "site_id": "default",
+            },
+            {
+                "_id": "static-001",
+                "name": "Static Route 1",
+                "static-route_nexthop": "192.168.1.1",
+                "enabled": True,
+                "priority": 10,
+                "site_id": "default",
+            },
+            {
+                "_id": "policy-002",
+                "name": "Policy 2",
+                "action": "mark",
+                "enabled": True,
+                "match_criteria": {"destination_port": 5060, "protocol": "udp"},
+                "dscp_marking": 46,
+                "priority": 50,
+                "site_id": "default",
+            },
+            {
+                "_id": "static-002",
+                "name": "Static Route 2",
+                "static-route_nexthop": "192.168.1.2",
+                "enabled": True,
+                "priority": 20,
+                "site_id": "default",
+            },
+            {
+                "_id": "policy-003",
+                "name": "Policy 3",
+                "action": "allow",
+                "enabled": True,
+                "match_criteria": {"destination_port": 443, "protocol": "tcp"},
+                "priority": 25,
+                "site_id": "default",
+            },
+        ]
+
+        with patch("src.tools.qos.UniFiClient") as mock_client:
+            mock_instance = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_instance
+            mock_instance.is_authenticated = True
+            mock_instance.get = AsyncMock(return_value={"data": mixed_routes})
+
+            result = await list_traffic_routes("default", mock_settings, limit=2, offset=1)
+
+        assert [route["name"] for route in result] == ["Policy 2", "Policy 3"]
+
 
 class TestCreateTrafficRoute:
     @pytest.mark.asyncio
