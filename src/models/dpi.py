@@ -1,12 +1,14 @@
 """Deep Packet Inspection (DPI) models."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class DPICategory(BaseModel):
     """DPI category model."""
 
-    id: str = Field(..., alias="_id", description="Category identifier")
+    id: int | str = Field(
+        ..., validation_alias=AliasChoices("id", "_id"), description="Category identifier"
+    )
     name: str = Field(..., description="Category name")
     description: str | None = Field(None, description="Category description")
 

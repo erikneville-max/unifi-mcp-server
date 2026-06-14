@@ -27,7 +27,6 @@ from .firewall_policy import (
 )
 from .firewall_zone import FirewallZone
 from .integration_api import (
-    DPICategory,
     IntegrationClient,
     IntegrationDevice,
     IntegrationDeviceTag,
