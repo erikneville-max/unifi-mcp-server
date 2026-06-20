@@ -1061,6 +1061,8 @@ See [API.md](API.md) for complete API documentation, including:
 
 ## Development
 
+Command reference: [commands.md](commands.md)
+
 ### Setup Development Environment
 
 ```bash
