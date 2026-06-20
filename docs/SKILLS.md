@@ -4,7 +4,7 @@ This guide explains how to use the UniFi MCP Server's skill files with AI agents
 
 ## Overview
 
-When the UniFi MCP Server runs as a full MCP server, it loads all 86+ tool definitions into the LLM context for every conversation — even when you're not doing anything network-related. The skill system solves this in two complementary ways:
+When the UniFi MCP Server runs as a full MCP server, it loads all 215+ tool definitions into the LLM context for every conversation — even when you're not doing anything network-related. The skill system solves this in two complementary ways:
 
 | Approach | How it works | Best for |
 |---|---|---|
@@ -40,7 +40,7 @@ triggers:
   - ...
 ```
 
-When a conversation matches a trigger, the agent reads the skill to understand what's available, then decides whether to invoke the MCP server for that task — rather than always keeping 86+ tool definitions in context.
+When a conversation matches a trigger, the agent reads the skill to understand what's available, then decides whether to invoke the MCP server for that task — rather than always keeping 215+ tool definitions in context.
 
 ### Frontmatter tuning
 
@@ -99,7 +99,20 @@ When you're running the MCP server full-time (e.g., in Claude Desktop or Cursor)
 | `security` | firewall, firewall_groups, firewall_zones, firewall_policies, acls, port_forwarding, vpn, site_vpn, content_filtering | ~25 |
 | `system` | sites, site_manager, backups, qos, traffic_flows, traffic_matching_lists, dpi, dpi_tools, radius, application | ~40 |
 | `minimal` | sites, clients, devices | ~10 |
-| *(unset)* | All modules for the API type | 86+ |
+| *(unset)* | All modules for the API type | 215+ |
+
+### Planned application modes
+
+The existing profile system is the natural place to add more granular, application-specific tool exposure modes that reduce context-window bloat in larger deployments.
+
+| Planned mode | Intended tool surface |
+|---|---|
+| `network` | network, switching, WiFi, DHCP, DNS, traffic, client tools |
+| `protect` | cameras, NVR, events, talkback, Protect workflows |
+| `access` | doors, readers, credentials, visitors, access workflows |
+| `talk` | UniFi Talk devices, calls, lines, telephony workflows |
+| `drive` | UniFi Drive storage, files, sharing, drive workflows |
+| `read-only` | `get_*`, `list_*`, `stat_*`, `search_*` only |
 
 ### Configuration examples
 
@@ -217,7 +230,7 @@ to run commands. Example:
 
 | | Full MCP (no profile) | SKILL.md only | Profile MCP | Skill + Profile |
 |---|---|---|---|---|
-| Tool definitions in LLM context | All 86+ | None | Subset | Subset |
+| Tool definitions in LLM context | All 215+ | None | Subset | Subset |
 | Works without MCP server running | No | Yes (read-only awareness) | No | No |
 | Best for | Power users, automation | Casual awareness | Focused sessions | Focused sessions with AI guide |
 | Setup complexity | Low | Minimal | Low | Low |

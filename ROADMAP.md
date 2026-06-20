@@ -1,88 +1,102 @@
 # UniFi MCP Server — Development Roadmap
 
-## Phase 1: Foundation Hardening (v0.3.0)
-**Goal:** Stabilize existing 215 tools, close Network domain gaps, establish test discipline.
+This roadmap is synchronized with `DEVELOPMENT_PLAN.md` and reflects the current repo posture: phases 0–2 are complete, Phase 3 is the active implementation target, and Phases 4–5 define the next expansion steps.
 
-### Milestones
-1. **P1a — Connector parity** (1 week)
-   - Implement 5 connector proxy tools for Network + Protect (POST/GET/PUT/PATCH/DELETE).
-   - Add integration tests against mock connector console.
-2. **P1b — Network v1 integration API gaps** (2 weeks)
-   - Implement 26 missing Network endpoints from mcp-unifi-applications reference.
-   - Priority: read-only first (getsiteoverviewpage, getadopteddeviceoverviewpage, getconnectedclientoverviewpage, getnetworksoverviewpage, getwifibroadcastpage, getdnspolicypage, getwansoverviewpage, getvpnserverpage, getdevicetagpage, getdpiapplicationcategories).
-   - Then low-risk writes (createwifibroadcast, creatednspolicy, updatewifibroadcast, updatednspolicy, patchfirewallpolicy).
-   - Finally destructive (deletewifibroadcast, deletednspolicy, removedevice).
-3. **P1c — Test coverage gate** (1 week)
-   - Raise unit-test coverage threshold to 85%.
-   - Add contract tests for all P1b endpoints using recorded JSON samples.
-   - Add schema-validation tests for request/response models.
+## Current posture
 
-### Acceptance Criteria
-- All P1 endpoints have typed Pydantic models.
-- All P1 write endpoints have integration tests.
-- CI passes with coverage >= 85%.
-- No `unknown` mutability classification remains.
+- Phases 0–2: complete
+- Phase 3: Protect API integration (active)
+- Phase 4: testing, polish, minor gaps, developer experience
+- Phase 5: enterprise scale & operational excellence
 
 ---
 
-## Phase 2: Protect Domain (v0.4.0)
-**Goal:** Add UniFi Protect as a first-class domain with 40+ tools.
+## Phase 3: Protect API Integration (active)
 
-### Milestones
-1. **P2a — Protect read-only observability** (2 weeks)
-   - Cameras, lights, sensors, chimes, viewers, liveviews, NVRs.
-   - RTSP stream management, snapshots, subscriptions.
-2. **P2b — Protect control surfaces** (2 weeks)
-   - PTZ patrol/goto, alarm-manager webhooks, mic disable.
-   - Liveview CRUD, viewer patching.
-3. **P2c — Protect safety gates** (1 week)
-   - All mutating actions require explicit `confirm` parameter.
-   - Audit logging for every Protect tool execution.
+Goal: deliver native Protect coverage on top of the existing Network, Site Manager, and Cloud Connector foundations.
 
-### Acceptance Criteria
-- Protect domain has >= 35 tools.
-- All camera control actions are behind `confirm=True` gate.
-- Integration tests for Protect connector proxy.
+### Deliverables
 
----
+- `src/api/protect_client.py`
+- Protect models under `src/models/protect_*.py`
+- Tool modules for cameras, devices, NVR, views, and events
+- Protect MCP resources for cameras and events
+- Integration tests with mocked NVR responses
+- API documentation updates for all new Protect tools
 
-## Phase 3: Access Domain (v0.5.0)
-**Goal:** Add UniFi Access with full user/visitor/credential lifecycle.
+### Scope
 
-### Milestones
-1. **P3a — Access users & groups** (2 weeks)
-   - CRUD for users, user groups, access policies.
-   - NFC cards, PIN codes, license plates, touch passes.
-2. **P3b — Access visitors & doors** (2 weeks)
-   - Visitor CRUD, QR codes, door groups, doors.
-   - Webhook event subscriptions.
-3. **P3c — Access safety & audit** (1 week)
-   - Credential revocation requires `confirm`.
-   - Least-privilege auth checks.
+- Camera management: list, get, update, snapshot, RTSPS, talkback, PTZ
+- Light, sensor, and chime management
+- NVR details and device asset files
+- Live views and viewer settings
+- Protect events and alarm webhooks
+- Device update messages
 
-### Acceptance Criteria
-- Access domain has >= 50 tools.
-- All credential mutations are gated.
-- Contract tests against OpenAPI schema.
+### Exit criteria
+
+- Protect tool coverage is complete for the documented endpoint set
+- Tests cover all new tools and response shapes
+- API docs and implementation stay in sync
 
 ---
 
-## Phase 4: Continuous Alignment (v0.6.0+)
-**Goal:** Automated upstream tracking, schema drift detection, release automation.
+## Phase 4: Testing, polish, minor gaps, and developer experience
 
-### Milestones
-1. **P4a — Upstream scraper pipeline** (2 weeks)
-   - Re-run scraper weekly against UniFi API docs.
-   - Diff against committed spec snapshots.
-   - Auto-open issues for new/deprecated endpoints.
-2. **P4b — Schema validation layer** (1 week)
-   - JSON Schema validation for all responses.
-   - Pydantic model generation from OpenAPI specs where available.
-3. **P4c — Release automation** (1 week)
-   - Auto-generate changelog from commit messages.
-   - Version-bump + tag + PyPI publish on merge to main.
+Goal: harden the server, close the remaining small gaps, and add AI-friendly operational assets.
 
-### Acceptance Criteria
-- Weekly upstream diff runs in CI.
-- Schema validation fails CI on drift.
-- Release checklist is fully automated.
+### Deliverables
+
+- Full test coverage for new Phase 1–3 modules
+- Dynamic DNS full CRUD
+- Tagged MAC management
+- Device migration tools
+- `NETWORK_PLAYBOOK.md` runbook library
+- `skills/` domain knowledge packs
+- `Makefile`, `docker-compose.yml`, and `HARBOR_SETUP.md`
+- Release prep updates across README, API.md, UNIFI_API.md, and CHANGELOG.md
+
+### Exit criteria
+
+- Coverage target reached and stable
+- Developer workflow is standardized
+- Docs reflect the implemented feature set
+
+---
+
+## Phase 5: Enterprise scale & operational excellence
+
+Goal: turn the server into a multi-site, multi-team operating platform with strong safety and observability controls.
+
+### Deliverables
+
+- Multi-controller / multi-site orchestration
+- Dry-run / change-safe mode
+- Tool-level RBAC via API key scopes
+- Append-only audit log
+- Prometheus metrics endpoint
+- A2A agent card and manifest
+- Webhook event bus with Redis pub/sub
+- Access API integration
+- Tool exposure modes for network, protect, access, talk, drive, and read-only sessions
+
+### Exit criteria
+
+- Multi-controller routing is isolated and testable
+- Write operations are previewable, auditable, and scoped
+- Server observability is first-class
+- The Access domain is mapped and implemented
+- Named tool exposure modes keep per-session tool lists small and task-relevant
+
+---
+
+## Version roadmap
+
+| Version | Scope | Notes |
+|---------|-------|-------|
+| v0.2.5 | Current stable release | Baseline release artifact |
+| v0.3.0 | Phases 0–2 completion | Docs sync, Network refs, connector foundation |
+| v0.4.0 | Phase 3 | Protect API integration |
+| v0.5.0 | Phase 4 | Testing, polish, minor gaps, developer experience |
+| v1.0.0 | Phase 5 | Enterprise scale & operational excellence |
+| v1.1.0+ | Post-Phase 5 | Access API and follow-on expansion |

@@ -358,8 +358,8 @@ Tools are executable functions that perform actions on the UniFi Controller.
 
 ### Tool Categories
 
-- **Phase 3 Tools:** Read-only operations for querying network information
-- **Phase 4 Tools:** Mutating operations with safety mechanisms (confirm + dry-run)
+- **Read-only Tools:** Read-only operations for querying network information
+- **Mutating Tools:** Mutating operations with safety mechanisms (confirm + dry-run)
 
 ### Health Check
 
@@ -383,7 +383,7 @@ result = await mcp.call_tool("health_check", {})
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0",
+  "version": "0.2.5",
   "api_type": "cloud"
 }
 ```
@@ -1816,7 +1816,7 @@ result = await mcp.call_tool("get_client_dpi", {
 }
 ```
 
-### Traffic Flow Monitoring (v0.2.0)
+### Traffic Flow Monitoring
 
 Real-time traffic flow monitoring and analysis for UniFi Network 9.0+. Provides comprehensive network visibility, security quick-response capabilities, and advanced analytics.
 
@@ -2237,7 +2237,7 @@ result = await mcp.call_tool("filter_traffic_flows", {
 
 ---
 
-### Network Topology (v0.2.0)
+### Network Topology
 
 Retrieve and visualize your complete network topology including devices, clients, and their interconnections.
 
@@ -2919,7 +2919,7 @@ asyncio.run(monitor_devices())
 
 ## Example AI Assistant Prompts
 
-This section provides example natural language prompts you can use with AI assistants (like Claude) that have access to the UniFi MCP Server. These demonstrate real-world use cases for the v0.2.0 features.
+This section provides example natural language prompts you can use with AI assistants (like Claude) that have access to the UniFi MCP Server. These demonstrate real-world use cases for the current feature set.
 
 ### Network Topology & Visualization
 
@@ -3135,4 +3135,4 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated:** 2025-11-16 | **API Version:** 0.2.0
+**Last Updated:** 2026-06-20 | **API Version:** v10.3.55

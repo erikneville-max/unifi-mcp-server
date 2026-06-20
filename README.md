@@ -30,6 +30,15 @@ pip install unifi-mcp-server
 
 **See:** [RELEASE_NOTES_0.2.5.md](RELEASE_NOTES_0.2.5.md) for complete changelog.
 
+## Current Development Posture
+
+- Current repo codebase: ~215 async tool functions across 40+ modules
+- Phases 0–2 are complete
+- Phase 3 (Protect API integration) is the active implementation target
+- Phase 4 adds testing, polish, minor gaps, runbooks, skills, and developer workflow hardening
+- Phase 5 adds multi-controller orchestration, dry-run, RBAC, audit logging, metrics, A2A, webhooks, Access API work, and tool exposure modes for context reduction
+- Canonical roadmap: `DEVELOPMENT_PLAN.md`
+
 **Previous Release - v0.2.4 (2026-02-19):**
 
 - 🚨 **Critical Startup Fix (issue #42)** - `ImportError: cannot import 'config' from 'agnost'` prevented startup. Fixed by moving agnost imports inside the conditional block.
@@ -135,6 +144,26 @@ The UniFi MCP Server supports **multiple transport modes** for different deploym
 - ⚙️ **Configuration**: `MCP_SERVER_TRANSPORT=streamable_http` + `MCP_SERVER_PORT=3000`
 
 **💡 Recommendation**: Use **STDIO** for local AI clients (Claude Desktop, Cursor). Use **SSE** when running behind an MCP gateway to consolidate multiple MCP servers into a single URL.
+
+## 🧭 Tool Exposure Modes (Planned)
+
+To reduce context-window bloat, the server will add named tool-exposure modes that only register the tools relevant to a given UniFi application area.
+
+### Planned modes
+
+- `network` — network, switching, WiFi, DHCP, DNS, traffic, and client tools
+- `protect` — cameras, NVR, events, talkback, and Protect workflows
+- `access` — doors, readers, credentials, visitors, and access-control workflows
+- `talk` — UniFi Talk devices, calls, lines, and telephony workflows
+- `drive` — UniFi Drive storage, files, sharing, and drive workflows
+- `read-only` — `get_*`, `list_*`, `stat_*`, and `search_*` tools only
+
+### Intended behavior
+
+- Keep the full tool surface available when no mode is selected
+- Expose fewer tools per session so agents do not carry unrelated UniFi modules in context
+- Make the server easier to use in application-specific deployments and focused agent workflows
+- Pair with `UNIFI_PROFILE` so mode selection is explicit and repeatable
 
 ### Running in SSE Mode
 
@@ -286,7 +315,7 @@ pip install unifi-mcp-server
 uv pip install unifi-mcp-server
 
 # Install specific version
-pip install unifi-mcp-server==0.2.0
+pip install unifi-mcp-server==0.2.5
 ```
 
 After installation, the `unifi-mcp-server` command will be available globally.
@@ -362,7 +391,7 @@ docker-compose down
 
 **Included Services:**
 
-- **UniFi MCP Server**: Main MCP server with 86+ tools
+- **UniFi MCP Server**: Main MCP server with ~215 async tool functions
 - **MCP Toolbox**: Web-based analytics dashboard (port 8080)
 - **Redis**: High-performance caching layer
 
@@ -882,7 +911,7 @@ After installing from PyPI (`pip install unifi-mcp-server`):
 
 ### Using as a Claude Code Skill
 
-The repo ships a `SKILL.md` and four categorized skill files in `skills/` that let AI agents load UniFi context on-demand — without keeping all 86+ tool definitions in the LLM context for every conversation.
+The repo ships a `SKILL.md` and four categorized skill files in `skills/` that let AI agents load UniFi context on-demand — without keeping all 215+ tool definitions in the LLM context for every conversation.
 
 #### Install the skill
 
@@ -1055,7 +1084,7 @@ pytest tests/unit/ --cov=src --cov-report=html --cov-report=term-missing
 # Run specific test file
 pytest tests/unit/test_zbf_tools.py -v
 
-# Run tests for new v0.2.0 features
+# Run tests for the current feature set
 pytest tests/unit/test_new_models.py tests/unit/test_zbf_tools.py tests/unit/test_traffic_flow_tools.py
 
 # Run only unit tests (fast)
@@ -1065,25 +1094,20 @@ pytest -m unit
 pytest -m integration
 ```
 
-**Current Test Coverage (v0.2.0)**:
+**Current Test Coverage**:
 
-- **Overall**: 78.18% (990 tests passing)
-- **Total Statements**: 6,105 statements, 4,865 covered
-- **Branch Coverage**: 75.03%
+- 1,236 tests passing across Python 3.10-3.13
+- Coverage and module-level reporting are tracked in Codecov and CI
+- Module-specific targets are maintained in `DEVELOPMENT_PLAN.md` and the test suite
 
 [![Coverage Sunburst](https://codecov.io/github/enuno/unifi-mcp-server/graphs/sunburst.svg?token=ZD314B59CE)](https://codecov.io/github/enuno/unifi-mcp-server)
 
-**By Module Category:**
+**Coverage focus areas:**
 
-- **Models**: 98%+ coverage (Excellent)
-- **Core Tools**: 90-100% coverage (Excellent)
-- **v0.2.0 Features**: 70-96% coverage (Good to Excellent)
-  - Topology: 95.83% (29 tests)
-  - Backup & Restore: 86.32% (10 tests)
-  - Multi-Site Aggregation: 92.95% (10 tests)
-  - QoS: 82.43% (46 tests)
-  - RADIUS: 69.77% (17 tests)
-- **Utilities**: 90%+ coverage (Excellent)
+- Models and validation layers
+- Core tool paths and safety controls
+- Network, security, and operations surfaces
+- Utilities and helpers
 
 **Top Coverage Performers** (>95%):
 
@@ -1138,7 +1162,7 @@ unifi-mcp-server/
 │   ├── unifi-security.md  # Firewall, ZBF, ACLs, VPN, content filtering
 │   └── unifi-system.md    # Sites, backups, traffic flows, DPI, RADIUS
 ├── src/
-│   ├── main.py            # MCP server entry point (86+ tools registered)
+│   ├── main.py            # MCP server entry point (215+ tools registered)
 │   ├── cache.py           # Redis caching implementation
 │   ├── config/            # Configuration management
 │   ├── api/               # UniFi API client with rate limiting
@@ -1339,11 +1363,11 @@ Security is a top priority. Please see [SECURITY.md](SECURITY.md) for:
 - [x] Device interconnection mapping
 - [x] Port-level connection tracking
 - [x] Network depth analysis
-- [x] Coverage: 95.83% (29 tests passing)
+- [x] Coverage tracked in Codecov and CI
 
 **Quality Achievements:**
 
-- [x] 990 tests passing (78.18% coverage)
+- [x] 1,236 tests passing
 - [x] 18/18 CI/CD checks passing
 - [x] Zero security vulnerabilities
 - [x] 30+ AI assistant example prompts
