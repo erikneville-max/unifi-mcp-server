@@ -13,7 +13,7 @@ from src.tools.wans import (
     list_wan_connections,
     update_dynamic_dns,
 )
-from src.utils.exceptions import ValidationError
+from src.utils.exceptions import APIError, ResourceNotFoundError, ValidationError
 
 
 @pytest.fixture
@@ -128,6 +128,22 @@ class TestDynamicDNS:
         assert result["id"] == "ddns-1"
         assert "x_password" not in result
 
+    async def test_get_dynamic_dns_handles_direct_dict_response(self, mock_settings):
+        mock_client = create_mock_client(make_dynamic_dns())
+
+        with patch("src.tools.wans.UniFiClient", return_value=mock_client):
+            result = await get_dynamic_dns("ddns-1", "default", mock_settings)
+
+        assert result["id"] == "ddns-1"
+        assert result["host_name"] == "vpn.example.com"
+
+    async def test_get_dynamic_dns_empty_response_raises_not_found(self, mock_settings):
+        mock_client = create_mock_client({"data": []})
+
+        with patch("src.tools.wans.UniFiClient", return_value=mock_client):
+            with pytest.raises(ResourceNotFoundError):
+                await get_dynamic_dns("ddns-1", "default", mock_settings)
+
     async def test_create_dynamic_dns_posts_custom_provider_payload(self, mock_settings):
         mock_client = create_mock_client({"data": [make_dynamic_dns()]})
 
@@ -166,6 +182,34 @@ class TestDynamicDNS:
         assert audit_parameters["x_password"] == "***REDACTED***"
         assert result["password_configured"] is True
 
+    async def test_create_dynamic_dns_invalid_hostname_raises(self, mock_settings):
+        with pytest.raises(ValidationError, match="host_name"):
+            await create_dynamic_dns(
+                site_id="default",
+                settings=mock_settings,
+                host_name="../bad",
+                confirm=True,
+            )
+
+    async def test_create_dynamic_dns_failure_is_audited(self, mock_settings):
+        mock_client = create_mock_client({})
+        mock_client.post = AsyncMock(side_effect=APIError("create failed"))
+
+        with (
+            patch("src.tools.wans.UniFiClient", return_value=mock_client),
+            patch("src.tools.wans.log_audit") as mock_audit,
+        ):
+            with pytest.raises(APIError):
+                await create_dynamic_dns(
+                    site_id="default",
+                    settings=mock_settings,
+                    host_name="vpn.example.com",
+                    confirm=True,
+                )
+
+        assert mock_audit.call_args.kwargs["result"] == "failed"
+        assert mock_audit.call_args.kwargs["error"] == "create failed"
+
     async def test_create_dynamic_dns_requires_confirm(self, mock_settings):
         with pytest.raises(ValidationError):
             await create_dynamic_dns(
@@ -175,17 +219,20 @@ class TestDynamicDNS:
             )
 
     async def test_create_dynamic_dns_dry_run_redacts_password(self, mock_settings):
-        result = await create_dynamic_dns(
-            site_id="default",
-            settings=mock_settings,
-            host_name="vpn.example.com",
-            password="secret-token",
-            confirm=False,
-            dry_run=True,
-        )
+        with patch("src.tools.wans.log_audit") as mock_audit:
+            result = await create_dynamic_dns(
+                site_id="default",
+                settings=mock_settings,
+                host_name="vpn.example.com",
+                password="secret-token",
+                confirm=False,
+                dry_run=True,
+            )
 
         assert result["dry_run"] is True
         assert result["would_create"]["x_password"] == "***REDACTED***"
+        assert mock_audit.call_args.kwargs["result"] == "dry_run"
+        assert mock_audit.call_args.kwargs["dry_run"] is True
 
     async def test_update_dynamic_dns_puts_partial_payload(self, mock_settings):
         mock_client = create_mock_client(
@@ -221,8 +268,38 @@ class TestDynamicDNS:
         assert result["host_name"] == "new.example.com"
         assert result["password_configured"] is False
 
+    async def test_update_dynamic_dns_empty_payload_raises(self, mock_settings):
+        with pytest.raises(ValidationError, match="At least one field"):
+            await update_dynamic_dns(
+                dynamic_dns_id="ddns-1",
+                site_id="default",
+                settings=mock_settings,
+                confirm=True,
+            )
+
+    async def test_update_dynamic_dns_empty_response_raises_not_found(self, mock_settings):
+        mock_client = create_mock_client({"data": []})
+
+        with (
+            patch("src.tools.wans.UniFiClient", return_value=mock_client),
+            patch("src.tools.wans.log_audit") as mock_audit,
+        ):
+            with pytest.raises(ResourceNotFoundError):
+                await update_dynamic_dns(
+                    dynamic_dns_id="ddns-1",
+                    site_id="default",
+                    settings=mock_settings,
+                    host_name="new.example.com",
+                    confirm=True,
+                )
+
+        assert mock_audit.call_args.kwargs["result"] == "failed"
+
     async def test_update_dynamic_dns_dry_run_skips_api_call(self, mock_settings):
-        with patch("src.tools.wans.UniFiClient") as mock_client_cls:
+        with (
+            patch("src.tools.wans.UniFiClient") as mock_client_cls,
+            patch("src.tools.wans.log_audit") as mock_audit,
+        ):
             result = await update_dynamic_dns(
                 dynamic_dns_id="ddns-1",
                 site_id="default",
@@ -237,6 +314,7 @@ class TestDynamicDNS:
             "login": "new-user",
             "x_password": "***REDACTED***",
         }
+        assert mock_audit.call_args.kwargs["result"] == "dry_run"
 
     async def test_delete_dynamic_dns(self, mock_settings):
         mock_client = create_mock_client({})
@@ -254,14 +332,29 @@ class TestDynamicDNS:
 
         mock_client.delete.assert_called_once_with("/ea/sites/default/rest/dynamicdns/ddns-1")
         assert mock_audit.call_args.kwargs["operation"] == "delete_dynamic_dns"
-        assert result["status"] == "deleted"
+        assert result == {
+            "status": "deleted",
+            "dynamic_dns_id": "ddns-1",
+            "site_id": "default",
+        }
 
     async def test_delete_dynamic_dns_dry_run(self, mock_settings):
-        result = await delete_dynamic_dns(
-            dynamic_dns_id="ddns-1",
-            site_id="default",
-            settings=mock_settings,
-            dry_run=True,
-        )
+        with patch("src.tools.wans.log_audit") as mock_audit:
+            result = await delete_dynamic_dns(
+                dynamic_dns_id="ddns-1",
+                site_id="default",
+                settings=mock_settings,
+                dry_run=True,
+            )
 
         assert result == {"dry_run": True, "would_delete": "ddns-1"}
+        assert mock_audit.call_args.kwargs["result"] == "dry_run"
+
+    async def test_delete_dynamic_dns_invalid_id_raises(self, mock_settings):
+        with pytest.raises(ValidationError, match="dynamic_dns_id"):
+            await delete_dynamic_dns(
+                dynamic_dns_id="../ddns-1",
+                site_id="default",
+                settings=mock_settings,
+                confirm=True,
+            )
