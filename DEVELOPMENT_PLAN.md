@@ -81,7 +81,7 @@ All items from the previous revision (D1–D7) are resolved as of Phase 0 comple
 
 | # | Gap | Notes |
 |---|-----|-------|
-| G4 | **Dynamic DNS full CRUD** | GET exists; PUT/POST/DELETE for custom providers missing. |
+| G4 | **Dynamic DNS full CRUD** | Completed in `src/tools/wans.py` with local `rest/dynamicdns` list/get/create/update/delete tools. |
 | G5 | **Tagged MAC Management** | `/rest/tag` endpoints. Low priority. |
 | G6 | **Device Migration** | `/cmd/devmgr/migrate`, `/cmd/devmgr/cancel-migrate`. Low priority. |
 
@@ -186,7 +186,7 @@ This is a new application domain requiring new API client context, models, and t
 
 #### 4.1 Minor Gap Closure
 
-- Dynamic DNS full CRUD (`src/tools/wans.py` extension)
+- Dynamic DNS full CRUD (`src/tools/wans.py` extension) - complete
 - Tagged MAC management (`src/tools/devices.py` extension or new module)
 - Device migration tools
 - Access API foundational research (door/credential list tools as preview)

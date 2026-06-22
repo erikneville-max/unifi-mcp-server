@@ -756,6 +756,119 @@ result = await mcp.call_tool("get_network_statistics", {
 }
 ```
 
+### WAN and Dynamic DNS Tools
+
+#### `list_wan_connections`
+
+List WAN connections for a site.
+
+**Parameters:**
+
+- `site_id` (string, required): Site identifier
+
+**Returns:**
+Array of WAN connection objects.
+
+**Example:**
+
+```python
+result = await mcp.call_tool("list_wan_connections", {
+    "site_id": "default"
+})
+```
+
+#### `list_dynamic_dns`
+
+List Dynamic DNS records for a site. This local API tool redacts stored password
+material and returns `password_configured` instead.
+
+**Parameters:**
+
+- `site_id` (string, required): Site identifier
+
+**Returns:**
+Array of Dynamic DNS records.
+
+**Example:**
+
+```python
+result = await mcp.call_tool("list_dynamic_dns", {
+    "site_id": "default"
+})
+```
+
+#### `get_dynamic_dns`
+
+Get one Dynamic DNS record by ID.
+
+**Parameters:**
+
+- `dynamic_dns_id` (string, required): Dynamic DNS record ID
+- `site_id` (string, required): Site identifier
+
+**Returns:**
+Dynamic DNS record details.
+
+#### `create_dynamic_dns`
+
+Create a Dynamic DNS record. Mutating operation; requires `confirm=true` unless
+`dry_run=true`.
+
+**Parameters:**
+
+- `site_id` (string, required): Site identifier
+- `host_name` (string, required): Hostname to update
+- `service` (string, optional): Provider service name, default `custom`
+- `interface` (string, optional): WAN interface identifier, default `wan`
+- `login` (string, optional): Provider login or username
+- `password` (string, optional): Provider password or token, sent as `x_password`
+- `server` (string, optional): Provider server for custom configurations
+- `custom_service` (string, optional): Custom provider protocol/service label
+- `options` (array, optional): Provider-specific options
+- `confirm` (boolean/string, required for execution): Set true to apply
+- `dry_run` (boolean/string, optional): Preview without applying
+
+**Example:**
+
+```python
+result = await mcp.call_tool("create_dynamic_dns", {
+    "site_id": "default",
+    "host_name": "vpn.example.com",
+    "service": "custom",
+    "server": "updates.example.com",
+    "custom_service": "dyndns",
+    "login": "api-user",
+    "password": "provider-token",
+    "confirm": True
+})
+```
+
+#### `update_dynamic_dns`
+
+Update a Dynamic DNS record. Mutating operation; requires `confirm=true` unless
+`dry_run=true`.
+
+**Parameters:**
+
+- `dynamic_dns_id` (string, required): Dynamic DNS record ID
+- `site_id` (string, required): Site identifier
+- `host_name`, `service`, `interface`, `login`, `password`, `server`,
+  `custom_service`, `options` (optional): Fields to update
+- `confirm` (boolean/string, required for execution): Set true to apply
+- `dry_run` (boolean/string, optional): Preview without applying
+
+#### `delete_dynamic_dns`
+
+Delete a Dynamic DNS record. Mutating operation; requires `confirm=true` unless
+`dry_run=true`.
+
+**Parameters:**
+
+- `dynamic_dns_id` (string, required): Dynamic DNS record ID
+- `site_id` (string, required): Site identifier
+- `confirm` (boolean/string, required for execution): Set true to apply
+- `dry_run` (boolean/string, optional): Preview without applying
+
 ### Site Management Tools
 
 #### `get_site_details`

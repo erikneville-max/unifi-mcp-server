@@ -48,7 +48,7 @@ Goal: harden the server, close the remaining small gaps, and add AI-friendly ope
 ### Deliverables
 
 - Full test coverage for new Phase 1–3 modules
-- Dynamic DNS full CRUD
+- Dynamic DNS full CRUD - complete
 - Tagged MAC management
 - Device migration tools
 - `NETWORK_PLAYBOOK.md` runbook library

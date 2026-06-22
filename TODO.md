@@ -1,7 +1,7 @@
 # UniFi MCP Server — Active TODO
 
-**Last Updated:** 2026-06-20
-**Current Codebase:** ~215 async tool functions across 40+ modules
+**Last Updated:** 2026-06-22
+**Current Codebase:** ~220 async tool functions across 40+ modules
 **Current Posture:** Phase 3 active; Phase 4 and Phase 5 queued
 
 This TODO mirrors `DEVELOPMENT_PLAN.md` and tracks the work that is still open in the repo.
@@ -26,7 +26,7 @@ This TODO mirrors `DEVELOPMENT_PLAN.md` and tracks the work that is still open i
 ### Phase 4 — Testing, polish, minor gaps, developer experience
 
 - [ ] Add tests for all new Phase 1–3 modules
-- [ ] Close remaining minor gaps: Dynamic DNS full CRUD
+- [x] Close remaining minor gaps: Dynamic DNS full CRUD
 - [ ] Close remaining minor gaps: Tagged MAC management
 - [ ] Close remaining minor gaps: Device migration tools
 - [ ] Add `NETWORK_PLAYBOOK.md` runbook library
