@@ -17,6 +17,10 @@ from fastmcp import FastMCP
 from .config import APIType, Settings, TransportMode
 from .resources import ClientsResource, DevicesResource, NetworksResource, SitesResource
 from .resources import site_manager as site_manager_resource
+from .a2a import A2AHTTPRouter, A2AState
+from .a2a.auth import AuthManager
+from .a2a.audit import get_audit_logger
+from .a2a.route_policy import SafetyController, ConfirmationWorkflow
 from .tool_registry import register_module_tools
 from .tools import acls as acls_tools
 from .tools import application as application_tools
@@ -423,6 +427,18 @@ def main() -> None:
     if _active_profile:
         logger.info(f"Profile: {_active_profile} ({len(_TOOL_MODULES)} module(s) active)")
 
+    # ---------------------------------------------------------------------------
+    # A2A protocol HTTP router (mounted when not in stdio mode)
+    # ---------------------------------------------------------------------------
+    a2a_state = A2AState(
+        settings=settings,
+        audit_logger=get_audit_logger(),
+        auth_manager=AuthManager(),
+        safety_controller=SafetyController(),
+        confirmation_workflow=ConfirmationWorkflow(),
+    )
+    a2a_router = A2AHTTPRouter(state=a2a_state)
+
     if settings.server_transport == TransportMode.STDIO:
         logger.info("Transport: stdio (default)")
         logger.info("Server ready to handle requests")
@@ -430,6 +446,59 @@ def main() -> None:
     else:
         logger.info(f"Transport: {settings.server_transport.value}")
         logger.info(f"Server listening on {settings.server_host}:{settings.server_port}")
+        logger.info("A2A endpoints: /a2a/agent-card, /a2a/discover, /a2a/delegate, /a2a/confirm, /a2a/audit")
+        # FastMCP 3.x HTTP transport uses an internal Starlette app; we mount
+        # the A2A router after server startup via a small wrapper.
+        import asyncio
+
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Mount, Route
+
+        from .a2a.http_handlers import (
+            confirm_handler,
+            delegate_handler,
+            discover_handler,
+            get_agent_card_handler,
+            get_audit_handler,
+        )
+
+        async def _a2a_agent_card(request):
+            return JSONResponse(get_agent_card_handler())
+
+        async def _a2a_discover(request):
+            body = await request.body()
+            payload = await request.json() if body else {}
+            return JSONResponse(await discover_handler(payload, state=a2a_state))
+
+        async def _a2a_delegate(request):
+            payload = await request.json()
+            return JSONResponse(await delegate_handler(payload, state=a2a_state))
+
+        async def _a2a_confirm(request):
+            payload = await request.json()
+            return JSONResponse(await confirm_handler(payload, state=a2a_state))
+
+        async def _a2a_audit(request):
+            payload = dict(request.query_params)
+            return JSONResponse(await get_audit_handler(payload, state=a2a_state))
+
+        # Try to mount onto FastMCP's internal Starlette app if available
+        _mounted = False
+        for attr in ("app", "_app", "server", "_server"):
+            app = getattr(mcp, attr, None)
+            if app is not None and hasattr(app, "add_route"):
+                app.add_route("/a2a/agent-card", _a2a_agent_card, methods=["GET"])
+                app.add_route("/a2a/discover", _a2a_discover, methods=["POST"])
+                app.add_route("/a2a/delegate", _a2a_delegate, methods=["POST"])
+                app.add_route("/a2a/confirm", _a2a_confirm, methods=["POST"])
+                app.add_route("/a2a/audit", _a2a_audit, methods=["GET"])
+                logger.info("A2A routes mounted on FastMCP internal app")
+                _mounted = True
+                break
+        if not _mounted:
+            logger.warning("Could not auto-mount A2A routes onto FastMCP app; use A2AHTTPRouter.mount() manually")
+
         mcp.run(
             transport=settings.server_transport.value,
             host=settings.server_host,
