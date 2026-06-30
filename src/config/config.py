@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     local_host: str | None = Field(
         default=None,
         description="Local UniFi controller hostname/IP",
-        validation_alias="UNIFI_LOCAL_HOST",
+        validation_alias=AliasChoices("UNIFI_LOCAL_HOST", "UNIFI_HOST"),
     )
 
     local_port: int = Field(
@@ -188,6 +188,8 @@ class Settings(BaseSettings):
         """
         if isinstance(v, APIType):
             return v
+        if v.lower() == "cloud":
+            return APIType.CLOUD_EA
         return APIType(v.lower())
 
     @field_validator("local_port")

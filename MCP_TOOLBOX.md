@@ -86,11 +86,11 @@ AGNOST_ORG_ID=your-organization-id-here
 ```
 
 ```bash
-# 4. Start all services
-docker-compose up -d
+# 4. Start the server, Redis, and Toolbox dashboard
+docker compose --profile toolbox up -d
 
 # 5. Verify services are running
-docker-compose ps
+docker compose ps
 
 # 6. Access the Toolbox dashboard
 open http://localhost:8080
@@ -100,10 +100,10 @@ open http://localhost:8080
 
 ```bash
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove volumes (includes Redis data)
-docker-compose down -v
+docker compose down -v
 ```
 
 ---
@@ -346,13 +346,13 @@ Watch your MCP server in real-time:
 1. Check if Toolbox container is running:
 
    ```bash
-   docker-compose ps mcp-toolbox
+   docker compose ps mcp-toolbox
    ```
 
 2. Check Toolbox logs:
 
    ```bash
-   docker-compose logs mcp-toolbox
+   docker compose logs mcp-toolbox
    ```
 
 3. Verify port is not in use:
@@ -384,13 +384,13 @@ Watch your MCP server in real-time:
 2. Check MCP server logs for tracking errors:
 
    ```bash
-   docker-compose logs unifi-mcp | grep -i agnost
+   docker compose logs unifi-mcp | grep -i agnost
    ```
 
 3. Verify MCP server is making tool calls:
 
    ```bash
-   docker-compose logs unifi-mcp | grep -i "tool"
+   docker compose logs unifi-mcp | grep -i "tool"
    ```
 
 4. Check Organization ID is correct in agnost.ai dashboard
@@ -412,7 +412,7 @@ Watch your MCP server in real-time:
 2. Restart Toolbox container:
 
    ```bash
-   docker-compose restart mcp-toolbox
+   docker compose --profile toolbox restart mcp-toolbox
    ```
 
 3. Disable authentication temporarily for testing:
@@ -559,7 +559,7 @@ Monitor service health:
 
 ```bash
 # Check all services
-docker-compose ps
+docker compose ps
 
 # Check specific service health
 docker inspect --format='{{.State.Health.Status}}' mcp-toolbox
@@ -606,8 +606,8 @@ A: Yes! MCP Toolbox works with any MCP server that implements agnost tracking.
 **Q: How do I update Toolbox to the latest version?**
 
 ```bash
-docker-compose pull mcp-toolbox
-docker-compose up -d mcp-toolbox
+docker compose --profile toolbox pull mcp-toolbox
+docker compose --profile toolbox up -d mcp-toolbox
 ```
 
 ---

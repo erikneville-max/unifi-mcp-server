@@ -65,13 +65,14 @@ services:
     image: us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:${TOOLBOX_VERSION:-0.14.0}
     container_name: mcp-toolbox
     restart: unless-stopped
+    profiles: ["toolbox"]
     ports:
       - "${TOOLBOX_PORT:-8080}:8080"
     command:
       - "--tools-file"
       - "/app/tools.yaml"
       - "--telemetry-otlp"
-      - "https://api.agnost.ai/v1/otel/${AGNOST_ORG_ID}"
+      - "https://api.agnost.ai/v1/otel/${AGNOST_ORG_ID:-}"
       - "--telemetry-service-name"
       - "${TOOLBOX_SERVICE_NAME:-unifi-mcp-toolbox}"
     volumes:

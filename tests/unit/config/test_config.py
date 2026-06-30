@@ -36,6 +36,12 @@ class TestSettingsValidateApiType:
         settings = Settings()
         assert settings.api_type == APIType.CLOUD_V1
 
+    def test_validate_api_type_legacy_cloud_alias(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("UNIFI_API_KEY", "test-key")
+        monkeypatch.setenv("UNIFI_API_TYPE", "cloud")
+        settings = Settings()
+        assert settings.api_type == APIType.CLOUD_EA
+
     def test_validate_api_type_local(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("UNIFI_API_KEY", "test-key")
         monkeypatch.setenv("UNIFI_API_TYPE", "LOCAL")
@@ -101,6 +107,14 @@ class TestSettingsLocalConfiguration:
         monkeypatch.setenv("UNIFI_API_KEY", "test-key")
         monkeypatch.setenv("UNIFI_API_TYPE", "local")
         monkeypatch.setenv("UNIFI_LOCAL_HOST", "192.168.2.1")
+        settings = Settings()
+        assert settings.local_host == "192.168.2.1"
+
+    def test_local_accepts_legacy_host_env_name(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("UNIFI_API_KEY", "test-key")
+        monkeypatch.setenv("UNIFI_API_TYPE", "local")
+        monkeypatch.delenv("UNIFI_LOCAL_HOST", raising=False)
+        monkeypatch.setenv("UNIFI_HOST", "192.168.2.1")
         settings = Settings()
         assert settings.local_host == "192.168.2.1"
 

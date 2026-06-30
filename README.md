@@ -366,33 +366,34 @@ pip install -e ".[dev]"
 
 #### Using Docker Compose (Recommended for Production)
 
-The recommended way to run the UniFi MCP Server with full monitoring capabilities:
+The recommended way to run the UniFi MCP Server with Redis caching:
 
 ```bash
 # 1. Copy and configure environment variables
 cp .env.docker.example .env
-# Edit .env with your UNIFI_API_KEY and AGNOST_ORG_ID
+# Edit .env with your UNIFI_API_KEY
 
-# 2. Start all services (MCP Server + Redis + MCP Toolbox)
-docker-compose up -d
+# 2. Start core services (MCP Server + Redis)
+docker compose up -d --build
 
 # 3. Check service status
-docker-compose ps
+docker compose ps
 
 # 4. View logs
-docker-compose logs -f unifi-mcp
+docker compose logs -f unifi-mcp
 
-# 5. Access MCP Toolbox dashboard
-open http://localhost:8080
+# 5. Optional: start MCP Toolbox dashboard
+# Requires AGNOST_ORG_ID in .env
+docker compose --profile toolbox up -d
 
 # 6. Stop all services
-docker-compose down
+docker compose down
 ```
 
 **Included Services:**
 
 - **UniFi MCP Server**: Main MCP server with ~215 async tool functions
-- **MCP Toolbox**: Web-based analytics dashboard (port 8080)
+- **MCP Toolbox**: Optional web-based analytics dashboard (port 8080, `toolbox` profile)
 - **Redis**: High-performance caching layer
 
 See [MCP_TOOLBOX.md](MCP_TOOLBOX.md) for detailed Toolbox documentation.

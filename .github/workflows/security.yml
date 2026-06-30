@@ -234,7 +234,6 @@ jobs:
           tags: unifi-mcp-server:scan
           cache-from: type=gha
           cache-to: type=gha,mode=max
-        continue-on-error: true
 
       - name: Run Trivy on Docker image
         uses: aquasecurity/trivy-action@master
