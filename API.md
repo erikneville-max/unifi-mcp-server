@@ -838,7 +838,7 @@ result = await mcp.call_tool("create_dynamic_dns", {
     "server": "updates.example.com",
     "custom_service": "dyndns",
     "login": "api-user",
-    "password": "provider-token",
+    "password": "provider-token",  # pragma: allowlist secret
     "confirm": True
 })
 ```

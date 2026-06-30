@@ -42,7 +42,7 @@ Add to your MCP client config (`~/.claude/mcp.json` or equivalent):
       "command": "uvx",
       "args": ["unifi-mcp-server"],
       "env": {
-        "UNIFI_API_KEY": "your-api-key",
+        "UNIFI_API_KEY": "",
         "UNIFI_API_TYPE": "local",
         "UNIFI_LOCAL_HOST": "192.168.2.1"
       }
