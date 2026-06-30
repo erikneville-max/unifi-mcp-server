@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from secrets import compare_digest, token_urlsafe
 from threading import RLock
@@ -229,7 +229,7 @@ class SafetyController:
         policy = self._find_policy(tool_name)
         key = (agent_id, self._normalize_tool_name(tool_name))
         period_seconds = self.settings.rate_limit_period if self.settings else 60
-        now = datetime.now(tz=UTC).timestamp()
+        now = datetime.now(tz=timezone.utc).timestamp()
         window_start = now - period_seconds
 
         with self._lock:
@@ -317,7 +317,7 @@ class ConfirmationWorkflow:
 
     def request_confirmation(self, tool_name: str, params: Mapping[str, Any], reason: str) -> ConfirmationToken:
         """Create a confirmation token for a pending action."""
-        now = datetime.now(tz=UTC)
+        now = datetime.now(tz=timezone.utc)
         token = ConfirmationToken(
             token=token_urlsafe(32),
             tool_name=tool_name,
@@ -337,7 +337,7 @@ class ConfirmationWorkflow:
             stored = self._tokens.get(token_value)
             if stored is None:
                 return False
-            if datetime.now(tz=UTC) >= stored.expires_at:
+            if datetime.now(tz=timezone.utc) >= stored.expires_at:
                 self._tokens.pop(token_value, None)
                 return False
 

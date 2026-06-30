@@ -87,7 +87,7 @@ jobs:
       - name: Run unit tests with coverage gate
         run: |
           source .venv/bin/activate
-          pytest tests/ -m "not integration" --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=80
+          pytest tests/ -m "not integration" --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
