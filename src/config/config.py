@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     local_verify_ssl: bool = Field(
         default=True,
         description="Verify SSL certificates for local controller",
-        validation_alias="UNIFI_LOCAL_VERIFY_SSL",
+        validation_alias=AliasChoices("UNIFI_LOCAL_VERIFY_SSL", "UNIFI_VERIFY_SSL"),
     )
 
     # Site Configuration
@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(
         default=100,
         description="Maximum requests per minute (EA tier: 100, v1 tier: 10000)",
-        validation_alias="UNIFI_RATE_LIMIT_REQUESTS",
+        validation_alias=AliasChoices("UNIFI_RATE_LIMIT_REQUESTS", "UNIFI_RATE_LIMIT"),
     )
 
     rate_limit_period: int = Field(
@@ -120,7 +120,7 @@ class Settings(BaseSettings):
     request_timeout: int = Field(
         default=30,
         description="Request timeout in seconds",
-        validation_alias="UNIFI_REQUEST_TIMEOUT",
+        validation_alias=AliasChoices("UNIFI_REQUEST_TIMEOUT", "UNIFI_TIMEOUT"),
     )
 
     # Caching Configuration
@@ -140,7 +140,7 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO",
         description="Logging level",
-        validation_alias="LOG_LEVEL",
+        validation_alias=AliasChoices("LOG_LEVEL", "MCP_LOG_LEVEL"),
     )
 
     log_api_requests: bool = Field(

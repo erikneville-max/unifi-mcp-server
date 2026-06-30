@@ -170,6 +170,15 @@ class TestSettingsVerifySsl:
         settings = Settings()
         assert settings.verify_ssl is False
 
+    def test_verify_ssl_accepts_legacy_env_name(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("UNIFI_API_KEY", "test-key")
+        monkeypatch.setenv("UNIFI_API_TYPE", "local")
+        monkeypatch.setenv("UNIFI_LOCAL_HOST", "192.168.2.1")
+        monkeypatch.delenv("UNIFI_LOCAL_VERIFY_SSL", raising=False)
+        monkeypatch.setenv("UNIFI_VERIFY_SSL", "false")
+        settings = Settings()
+        assert settings.verify_ssl is False
+
 
 class TestSettingsGetIntegrationPath:
     """Tests for Settings.get_integration_path method."""
@@ -280,6 +289,24 @@ class TestSettingsDefaults:
         monkeypatch.setenv("UNIFI_API_KEY", "test-key")
         settings = Settings()
         assert settings.rate_limit_requests == 100
+
+    def test_rate_limit_accepts_compose_env_name(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("UNIFI_API_KEY", "test-key")
+        monkeypatch.setenv("UNIFI_RATE_LIMIT", "250")
+        settings = Settings()
+        assert settings.rate_limit_requests == 250
+
+    def test_request_timeout_accepts_compose_env_name(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("UNIFI_API_KEY", "test-key")
+        monkeypatch.setenv("UNIFI_TIMEOUT", "45")
+        settings = Settings()
+        assert settings.request_timeout == 45
+
+    def test_log_level_accepts_mcp_env_name(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("UNIFI_API_KEY", "test-key")
+        monkeypatch.setenv("MCP_LOG_LEVEL", "DEBUG")
+        settings = Settings()
+        assert settings.log_level == "DEBUG"
 
     def test_default_site(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("UNIFI_API_KEY", "test-key")
