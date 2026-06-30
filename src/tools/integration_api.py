@@ -23,14 +23,7 @@ from ..models import (
     IntegrationWAN,
     IntegrationWifiBroadcast,
 )
-from ..utils import (
-    APIError,
-    get_logger,
-    sanitize_log_message,
-    validate_limit_offset,
-    validate_site_id,
-)
-
+from ..utils import get_logger, sanitize_log_message, validate_limit_offset, validate_site_id
 
 # ---------------------------------------------------------------------------
 # Sites
@@ -55,7 +48,6 @@ async def list_integration_sites(
     Returns:
         Paginated list of integration API sites
     """
-
     logger = get_logger(__name__, settings.log_level)
     final_limit, final_offset = validate_limit_offset(limit, offset)
 
@@ -104,7 +96,6 @@ async def list_integration_devices(
     Returns:
         Paginated list of integration API devices
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -122,7 +113,9 @@ async def list_integration_devices(
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
     devices = [IntegrationDevice.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(devices)} integration API devices for site {site_id}"))
+    logger.info(
+        sanitize_log_message(f"Listed {len(devices)} integration API devices for site {site_id}")
+    )
 
     return {
         "offset": final_offset,
@@ -148,7 +141,6 @@ async def get_integration_device(
     Returns:
         Device details
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
 
@@ -187,7 +179,6 @@ async def list_integration_clients(
     Returns:
         Paginated list of integration API clients
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -205,7 +196,9 @@ async def list_integration_clients(
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
     clients = [IntegrationClient.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(clients)} integration API clients for site {site_id}"))
+    logger.info(
+        sanitize_log_message(f"Listed {len(clients)} integration API clients for site {site_id}")
+    )
 
     return {
         "offset": final_offset,
@@ -231,7 +224,6 @@ async def get_integration_client(
     Returns:
         Client details
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
 
@@ -270,7 +262,6 @@ async def list_integration_networks(
     Returns:
         Paginated list of integration API networks
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -288,7 +279,9 @@ async def list_integration_networks(
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
     networks = [IntegrationNetwork.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(networks)} integration API networks for site {site_id}"))
+    logger.info(
+        sanitize_log_message(f"Listed {len(networks)} integration API networks for site {site_id}")
+    )
 
     return {
         "offset": final_offset,
@@ -321,7 +314,6 @@ async def list_integration_wifi_broadcasts(
     Returns:
         Paginated list of WiFi broadcasts
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -338,8 +330,14 @@ async def list_integration_wifi_broadcasts(
     total_count = response.get("totalCount", len(data)) if isinstance(response, dict) else len(data)
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
-    broadcasts = [IntegrationWifiBroadcast.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(broadcasts)} integration API WiFi broadcasts for site {site_id}"))
+    broadcasts = [
+        IntegrationWifiBroadcast.model_validate(item).model_dump(by_alias=True) for item in data
+    ]
+    logger.info(
+        sanitize_log_message(
+            f"Listed {len(broadcasts)} integration API WiFi broadcasts for site {site_id}"
+        )
+    )
 
     return {
         "offset": final_offset,
@@ -365,7 +363,6 @@ async def get_integration_wifi_broadcast(
     Returns:
         WiFi broadcast details
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
 
@@ -373,7 +370,9 @@ async def get_integration_wifi_broadcast(
         await client.authenticate()
         resolved_site_id = await client.resolve_site_id(site_id)
         response = await client.get(
-            settings.get_integration_path(f"sites/{resolved_site_id}/wifi/broadcasts/{broadcast_id}")
+            settings.get_integration_path(
+                f"sites/{resolved_site_id}/wifi/broadcasts/{broadcast_id}"
+            )
         )
 
     broadcast_data = response.get("data", response) if isinstance(response, dict) else response
@@ -404,7 +403,6 @@ async def list_integration_dns_policies(
     Returns:
         Paginated list of DNS policies
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -421,8 +419,14 @@ async def list_integration_dns_policies(
     total_count = response.get("totalCount", len(data)) if isinstance(response, dict) else len(data)
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
-    policies = [IntegrationDNSPolicy.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(policies)} integration API DNS policies for site {site_id}"))
+    policies = [
+        IntegrationDNSPolicy.model_validate(item).model_dump(by_alias=True) for item in data
+    ]
+    logger.info(
+        sanitize_log_message(
+            f"Listed {len(policies)} integration API DNS policies for site {site_id}"
+        )
+    )
 
     return {
         "offset": final_offset,
@@ -448,7 +452,6 @@ async def get_integration_dns_policy(
     Returns:
         DNS policy details
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
 
@@ -487,7 +490,6 @@ async def list_integration_wans(
     Returns:
         Paginated list of WAN connections
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -538,7 +540,6 @@ async def list_integration_vpn_servers(
     Returns:
         Paginated list of VPN servers
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -556,7 +557,11 @@ async def list_integration_vpn_servers(
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
     servers = [IntegrationVPNServer.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(servers)} integration API VPN servers for site {site_id}"))
+    logger.info(
+        sanitize_log_message(
+            f"Listed {len(servers)} integration API VPN servers for site {site_id}"
+        )
+    )
 
     return {
         "offset": final_offset,
@@ -589,7 +594,6 @@ async def list_integration_device_tags(
     Returns:
         Paginated list of device tags
     """
-
     logger = get_logger(__name__, settings.log_level)
     site_id = validate_site_id(site_id)
     final_limit, final_offset = validate_limit_offset(limit, offset)
@@ -607,7 +611,9 @@ async def list_integration_device_tags(
     count = response.get("count", len(data)) if isinstance(response, dict) else len(data)
 
     tags = [IntegrationDeviceTag.model_validate(item).model_dump(by_alias=True) for item in data]
-    logger.info(sanitize_log_message(f"Listed {len(tags)} integration API device tags for site {site_id}"))
+    logger.info(
+        sanitize_log_message(f"Listed {len(tags)} integration API device tags for site {site_id}")
+    )
 
     return {
         "offset": final_offset,
@@ -641,7 +647,6 @@ async def list_dpi_application_categories(
     Returns:
         Paginated list of DPI categories
     """
-
     logger = get_logger(__name__, settings.log_level)
     final_limit, final_offset = validate_limit_offset(limit, offset)
 

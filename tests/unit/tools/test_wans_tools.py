@@ -57,7 +57,7 @@ def make_dynamic_dns(dynamic_dns_id="ddns-1"):
         "server": "updates.example.com",
         "interface": "wan",
         "login": "api-user",
-        "x_password": "secret-token",
+        "x_password": "secret-token",  # pragma: allowlist secret
         "options": ["ssl=yes"],
     }
 
@@ -158,7 +158,7 @@ class TestDynamicDNS:
                 service="custom",
                 interface="wan",
                 login="api-user",
-                password="secret-token",
+                password="secret-token",  # pragma: allowlist secret
                 server="updates.example.com",
                 custom_service="dyndns",
                 options=["ssl=yes"],
@@ -172,7 +172,7 @@ class TestDynamicDNS:
                 "service": "custom",
                 "interface": "wan",
                 "login": "api-user",
-                "x_password": "secret-token",
+                "x_password": "secret-token",  # pragma: allowlist secret
                 "server": "updates.example.com",
                 "custom_service": "dyndns",
                 "options": ["ssl=yes"],
@@ -224,7 +224,7 @@ class TestDynamicDNS:
                 site_id="default",
                 settings=mock_settings,
                 host_name="vpn.example.com",
-                password="secret-token",
+                password="secret-token",  # pragma: allowlist secret
                 confirm=False,
                 dry_run=True,
             )
@@ -305,7 +305,7 @@ class TestDynamicDNS:
                 site_id="default",
                 settings=mock_settings,
                 login="new-user",
-                password="new-secret",
+                password="new-secret",  # pragma: allowlist secret
                 dry_run=True,
             )
 

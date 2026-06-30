@@ -12,13 +12,7 @@ from fastmcp.resources.function_resource import FunctionResource
 from fastmcp.tools.function_tool import FunctionTool
 
 from ..config import APIType, Settings
-from .types import (
-    AgentCard,
-    AuthenticationMode,
-    ResourceURI,
-    SafetyRequirement,
-    Skill,
-)
+from .types import AgentCard, AuthenticationMode, ResourceURI, SafetyRequirement, Skill
 
 _DESTRUCTIVE_NAME_RE = re.compile(
     r"(?:^|_)(?:create|delete|remove|reset|restore|reboot|restart|disable|enable|update|patch|set|modify|purge|clear|flush|provision|deprovision|shutdown)(?:_|$)",
@@ -135,7 +129,22 @@ def _is_destructive_tool(tool: FunctionTool) -> bool:
     description = _tool_description(tool).lower()
     if _DESTRUCTIVE_NAME_RE.search(name):
         return True
-    if any(token in description for token in ("delete", "remove", "reset", "restore", "reboot", "restart", "disable", "clear", "flush", "provision", "deprovision")):
+    if any(
+        token in description
+        for token in (
+            "delete",
+            "remove",
+            "reset",
+            "restore",
+            "reboot",
+            "restart",
+            "disable",
+            "clear",
+            "flush",
+            "provision",
+            "deprovision",
+        )
+    ):
         return True
     properties = _schema_for_tool(tool).get("properties", {})
     if isinstance(properties, dict) and "confirm" in properties:
@@ -151,7 +160,9 @@ def _sensitive_fields(tool: FunctionTool) -> list[str]:
     sensitive: list[str] = []
     for name in properties:
         normalized = name.lower()
-        if normalized in _SENSITIVE_FIELD_NAMES or any(token in normalized for token in _SENSITIVE_FIELD_NAMES):
+        if normalized in _SENSITIVE_FIELD_NAMES or any(
+            token in normalized for token in _SENSITIVE_FIELD_NAMES
+        ):
             sensitive.append(name)
     return sorted(dict.fromkeys(sensitive))
 
@@ -163,7 +174,11 @@ def _safety_requirement_for_tool(tool: FunctionTool) -> SafetyRequirement | None
     if not destructive and not sensitive_fields:
         return None
     confirmation_level = "required" if destructive else "recommended"
-    reason = "Mutating controller state requires explicit confirmation." if destructive else "Sensitive parameters detected."
+    reason = (
+        "Mutating controller state requires explicit confirmation."
+        if destructive
+        else "Sensitive parameters detected."
+    )
     return SafetyRequirement(
         confirmationLevel=confirmation_level,
         destructive=destructive,

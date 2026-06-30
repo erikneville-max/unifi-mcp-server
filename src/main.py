@@ -14,13 +14,13 @@ except importlib.metadata.PackageNotFoundError:
 
 from fastmcp import FastMCP
 
+from .a2a import A2AState
+from .a2a.audit import get_audit_logger
+from .a2a.auth import AuthManager
+from .a2a.route_policy import ConfirmationWorkflow, SafetyController
 from .config import APIType, Settings, TransportMode
 from .resources import ClientsResource, DevicesResource, NetworksResource, SitesResource
 from .resources import site_manager as site_manager_resource
-from .a2a import A2AHTTPRouter, A2AState
-from .a2a.auth import AuthManager
-from .a2a.audit import get_audit_logger
-from .a2a.route_policy import SafetyController, ConfirmationWorkflow
 from .tool_registry import register_module_tools
 from .tools import acls as acls_tools
 from .tools import application as application_tools
@@ -40,8 +40,8 @@ from .tools import firewall as firewall_tools
 from .tools import firewall_groups as firewall_groups_tools
 from .tools import firewall_policies as firewall_policies_tools
 from .tools import firewall_zones as firewall_zones_tools
-from .tools import network_config as network_config_tools
 from .tools import integration_api as integration_api_tools
+from .tools import network_config as network_config_tools
 from .tools import networks as networks_tools
 from .tools import port_forwarding as port_fwd_tools
 from .tools import port_profiles as port_profile_tools
@@ -247,7 +247,7 @@ else:
     else:
         _TOOL_MODULES = _all_local
     logger.info(
-        f"Local API mode"
+        "Local API mode"
         + (f", profile={_active_profile}" if _active_profile else "")
         + f" - registering {len(_TOOL_MODULES)} tool module(s)"
     )
@@ -437,7 +437,6 @@ def main() -> None:
         safety_controller=SafetyController(),
         confirmation_workflow=ConfirmationWorkflow(),
     )
-    a2a_router = A2AHTTPRouter(state=a2a_state)
 
     if settings.server_transport == TransportMode.STDIO:
         logger.info("Transport: stdio (default)")
@@ -446,14 +445,13 @@ def main() -> None:
     else:
         logger.info(f"Transport: {settings.server_transport.value}")
         logger.info(f"Server listening on {settings.server_host}:{settings.server_port}")
-        logger.info("A2A endpoints: /a2a/agent-card, /a2a/discover, /a2a/delegate, /a2a/confirm, /a2a/audit")
+        logger.info(
+            "A2A endpoints: /a2a/agent-card, /a2a/discover, /a2a/delegate, /a2a/confirm, /a2a/audit"
+        )
         # FastMCP 3.x HTTP transport uses an internal Starlette app; we mount
         # the A2A router after server startup via a small wrapper.
-        import asyncio
 
-        from starlette.applications import Starlette
         from starlette.responses import JSONResponse
-        from starlette.routing import Mount, Route
 
         from .a2a.http_handlers import (
             confirm_handler,
@@ -497,7 +495,9 @@ def main() -> None:
                 _mounted = True
                 break
         if not _mounted:
-            logger.warning("Could not auto-mount A2A routes onto FastMCP app; use A2AHTTPRouter.mount() manually")
+            logger.warning(
+                "Could not auto-mount A2A routes onto FastMCP app; use A2AHTTPRouter.mount() manually"
+            )
 
         mcp.run(
             transport=settings.server_transport.value,

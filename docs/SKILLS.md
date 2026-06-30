@@ -125,7 +125,7 @@ The existing profile system is the natural place to add more granular, applicati
       "command": "uvx",
       "args": ["unifi-mcp-server"],
       "env": {
-        "UNIFI_API_KEY": "your-api-key",
+        "UNIFI_API_KEY": "",
         "UNIFI_API_TYPE": "local",
         "UNIFI_LOCAL_HOST": "192.168.2.1",
         "UNIFI_PROFILE": "security"
@@ -144,7 +144,7 @@ The existing profile system is the natural place to add more granular, applicati
       "command": "uvx",
       "args": ["unifi-mcp-server"],
       "env": {
-        "UNIFI_API_KEY": "your-api-key",
+        "UNIFI_API_KEY": "",
         "UNIFI_API_TYPE": "local",
         "UNIFI_LOCAL_HOST": "192.168.2.1",
         "UNIFI_PROFILE": "network"
@@ -154,7 +154,7 @@ The existing profile system is the natural place to add more granular, applicati
       "command": "uvx",
       "args": ["unifi-mcp-server"],
       "env": {
-        "UNIFI_API_KEY": "your-api-key",
+        "UNIFI_API_KEY": "",
         "UNIFI_API_TYPE": "local",
         "UNIFI_LOCAL_HOST": "192.168.2.1",
         "UNIFI_PROFILE": "security"
@@ -167,7 +167,7 @@ The existing profile system is the natural place to add more granular, applicati
 #### Environment variable (shell / .env)
 
 ```bash
-export UNIFI_API_KEY=your-api-key
+export UNIFI_API_KEY=
 export UNIFI_API_TYPE=local
 export UNIFI_LOCAL_HOST=192.168.2.1
 export UNIFI_PROFILE=devices
@@ -204,7 +204,7 @@ export PATH="$PATH:/path/to/unifi-mcp-server/bin"
 ### Usage
 
 ```bash
-export UNIFI_API_KEY=your-api-key
+export UNIFI_API_KEY=
 export UNIFI_API_TYPE=local
 export UNIFI_LOCAL_HOST=192.168.2.1
 
